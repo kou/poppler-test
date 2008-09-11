@@ -288,6 +288,21 @@ AC_SUBST(GDK_CFLAGS)
 AC_SUBST(GDK_LIBS)
 AC_SUBST(GDK_FEATURE)
 
+dnl
+dnl Cutter
+dnl
+if test x$enable_poppler_glib = xyes; then
+  m4_ifdef([AC_CHECK_GCUTTER],
+           [AC_CHECK_GCUTTER],
+           [ac_cv_use_cutter="no"])
+
+  AM_CONDITIONAL([WITH_CUTTER], [test "$ac_cv_use_cutter" != "no"])
+  if test "$ac_cv_use_cutter" != "no"; then
+    AC_DEFINE(WITH_CUTTER, 1, [Define to 1 if you use Cutter])
+  fi
+fi
+
+
 AC_ARG_ENABLE(poppler-qt,
 	      AC_HELP_STRING([--disable-poppler-qt],
 			     [Don't compile poppler qt wrapper.]),
@@ -437,6 +452,11 @@ glib/Makefile
 glib/poppler-features.h
 glib/reference/Makefile
 glib/demo/Makefile
+glib/test/Makefile
+glib/test/lib/Makefile
+glib/test/fixtures/Makefile
+glib/test/fixtures/document/Makefile
+glib/test/fixtures/page/Makefile
 test/Makefile
 qt/Makefile
 qt4/Makefile
