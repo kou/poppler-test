@@ -25,6 +25,7 @@
 void test_size (void);
 void test_index_single_page (void);
 void test_index_multi_pages (void);
+void test_get_text (void);
 
 static PopplerPage *page;
 
@@ -73,17 +74,13 @@ load_page (const gchar *fixture_data_component, gint n)
 void
 test_size (void)
 {
-  PopplerRectangle rectangle;
+  double width, height;
 
   page = load_page ("simple-page.pdf", 0);
 
-  rectangle.x1 = 0;
-  rectangle.y1 = 0;
-  poppler_page_get_size (page, &(rectangle.x2), &(rectangle.y2));
-  cut_assert_equal_string ("Hello, World!",
-                           poppler_page_get_text (page,
-                                                  POPPLER_SELECTION_GLYPH,
-                                                  &rectangle));
+  poppler_page_get_size (page, &width, &height);
+  cut_assert_equal_double (595, 0.1, width);
+  cut_assert_equal_double (842, 0.1, height);
 }
 
 void
@@ -100,4 +97,21 @@ test_index_multi_pages (void)
   page = load_page ("multi-pages.pdf", 1);
 
   cut_assert_equal_int (1, poppler_page_get_index (page));
+}
+
+void
+test_get_text (void)
+{
+  PopplerRectangle rectangle;
+  gchar *text;
+
+  page = load_page ("simple-page.pdf", 0);
+
+  rectangle.x1 = 0;
+  rectangle.y1 = 0;
+  poppler_page_get_size (page, &(rectangle.x2), &(rectangle.y2));
+  text = poppler_page_get_text (page,
+                                POPPLER_SELECTION_GLYPH,
+                                &rectangle);
+  cut_assert_equal_string_with_free ("Hello, World!", text);
 }
