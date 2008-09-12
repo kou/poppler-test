@@ -150,7 +150,6 @@ test_save_a_copy (void)
 
   copy_path = g_build_filename (tmp_dir, "copied-multi-pages.pdf", NULL);
   copy_uri = cut_take_printf ("file://%s", copy_path);
-  g_print("%s\n", copy_uri);
   g_free (copy_path);
 
   poppler_document_save_a_copy (document, copy_uri, &error);

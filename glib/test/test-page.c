@@ -23,6 +23,8 @@
 #include <gcutter.h>
 
 void test_size (void);
+void test_index_single_page (void);
+void test_index_multi_pages (void);
 
 static PopplerPage *page;
 
@@ -82,4 +84,20 @@ test_size (void)
                            poppler_page_get_text (page,
                                                   POPPLER_SELECTION_GLYPH,
                                                   &rectangle));
+}
+
+void
+test_index_single_page (void)
+{
+  page = load_page ("simple-page.pdf", 0);
+
+  cut_assert_equal_int (0, poppler_page_get_index (page));
+}
+
+void
+test_index_multi_pages (void)
+{
+  page = load_page ("multi-pages.pdf", 1);
+
+  cut_assert_equal_int (1, poppler_page_get_index (page));
 }
