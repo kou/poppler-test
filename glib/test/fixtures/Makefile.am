@@ -1,3 +1,2 @@
-SUBDIRS =		\
-	document	\
-	page
+SUBDIRS =	\
+	pdf

@@ -39,7 +39,7 @@ setup (void)
 
   cut_set_fixture_data_dir (poppler_test_get_base_dir (),
                             "fixtures",
-                            "document",
+                            "pdf",
                             NULL);
 
   tmp_base_dir = g_build_filename (poppler_test_get_base_dir (), "tmp", NULL);

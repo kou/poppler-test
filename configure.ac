@@ -455,8 +455,7 @@ glib/demo/Makefile
 glib/test/Makefile
 glib/test/lib/Makefile
 glib/test/fixtures/Makefile
-glib/test/fixtures/document/Makefile
-glib/test/fixtures/page/Makefile
+glib/test/fixtures/pdf/Makefile
 test/Makefile
 qt/Makefile
 qt4/Makefile

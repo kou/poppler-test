@@ -22,21 +22,24 @@
 
 #include <gcutter.h>
 
-void test_size (void);
+void test_get_size (void);
 void test_index_single_page (void);
 void test_index_multi_pages (void);
 void test_get_text (void);
+void test_get_form_field_mapping (void);
 
 static PopplerPage *page;
+static GList *fields;
 
 void
 setup (void)
 {
   page = NULL;
+  fields = NULL;
 
   cut_set_fixture_data_dir (poppler_test_get_base_dir (),
                             "fixtures",
-                            "page",
+                            "pdf",
                             NULL);
 }
 
@@ -45,6 +48,9 @@ teardown (void)
 {
   if (page)
     g_object_unref (page);
+
+  if (fields)
+    poppler_page_free_form_field_mapping (fields);
 }
 
 static PopplerPage *
@@ -72,7 +78,7 @@ load_page (const gchar *fixture_data_component, gint n)
 
 
 void
-test_size (void)
+test_get_size (void)
 {
   double width, height;
 
@@ -114,4 +120,13 @@ test_get_text (void)
                                 POPPLER_SELECTION_GLYPH,
                                 &rectangle);
   cut_assert_equal_string_with_free ("Hello, World!", text);
+}
+
+void
+test_get_form_field_mapping (void)
+{
+  page = load_page ("form.pdf", 0);
+
+  fields = poppler_page_get_form_field_mapping (page);
+  cut_assert_equal_int (6, g_list_length (fields));
 }
