@@ -8,7 +8,8 @@ TESTS_ENVIRONMENT = NO_MAKE=yes CUTTER="$(CUTTER)"
 
 noinst_LTLIBRARIES =		\
 	test-document.la	\
-	test-page.la
+	test-page.la		\
+	test-form-field.la
 endif
 
 INCLUDES =			\
@@ -31,6 +32,7 @@ AM_LDFLAGS =			\
 
 test_document_la_SOURCES = test-document.c
 test_page_la_SOURCES = test-page.c
+test_form_field_la_SOURCES = test-form-field.c
 
 echo-cutter:
 	@echo $(CUTTER)
