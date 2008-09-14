@@ -23,6 +23,7 @@
 #include <gcutter.h>
 
 void test_general (void);
+void test_radio_button (void);
 
 static PopplerPage *page;
 static GList *fields;
@@ -95,4 +96,23 @@ test_general (void)
   cut_assert_equal_int (65541, poppler_form_field_get_id (field));
   cut_assert_equal_double (0, 0.1, poppler_form_field_get_font_size (field));
   cut_assert_false (poppler_form_field_is_read_only (field));
+}
+
+void
+test_radio_button (void)
+{
+  PopplerFormFieldMapping *mapping;
+  PopplerFormField *field;
+
+  load_fields ();
+
+  mapping = g_list_nth_data (fields, 1);
+  field = mapping->field;
+  cut_assert_equal_int (POPPLER_FORM_FIELD_BUTTON,
+                        poppler_form_field_get_field_type (field));
+  cut_assert_equal_int (POPPLER_FORM_BUTTON_RADIO,
+                        poppler_form_field_button_get_button_type (field));
+  cut_assert_false (poppler_form_field_button_get_state (field));
+  poppler_form_field_button_set_state (field, TRUE);
+  cut_assert_true (poppler_form_field_button_get_state (field));
 }
