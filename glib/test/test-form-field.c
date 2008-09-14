@@ -26,6 +26,7 @@ void test_general (void);
 void test_push_button (void);
 void test_check_button (void);
 void test_radio_button (void);
+void test_normal_text (void);
 
 static PopplerPage *page;
 static GList *fields;
@@ -80,7 +81,7 @@ load_fields (void)
   page = load_page ("form.pdf", 0);
 
   fields = poppler_page_get_form_field_mapping (page);
-  cut_assert_equal_int (8, g_list_length (fields));
+  cut_assert_equal_int (10, g_list_length (fields));
 }
 
 void
@@ -91,7 +92,7 @@ test_general (void)
 
   load_fields ();
 
-  mapping = g_list_nth_data (fields, 2);
+  mapping = g_list_nth_data (fields, 4);
   field = mapping->field;
   cut_assert_equal_int (POPPLER_FORM_FIELD_CHOICE,
                         poppler_form_field_get_field_type (field));
@@ -108,7 +109,7 @@ test_push_button (void)
 
   load_fields ();
 
-  mapping = g_list_nth_data (fields, 5);
+  mapping = g_list_nth_data (fields, 7);
   field = mapping->field;
   cut_assert_equal_int (POPPLER_FORM_FIELD_BUTTON,
                         poppler_form_field_get_field_type (field));
@@ -129,7 +130,7 @@ test_check_button (void)
 
   load_fields ();
 
-  mapping = g_list_nth_data (fields, 7);
+  mapping = g_list_nth_data (fields, 9);
   field = mapping->field;
   cut_assert_equal_int (POPPLER_FORM_FIELD_BUTTON,
                         poppler_form_field_get_field_type (field));
@@ -150,7 +151,7 @@ test_radio_button (void)
 
   load_fields ();
 
-  mapping = g_list_nth_data (fields, 3);
+  mapping = g_list_nth_data (fields, 5);
   field = mapping->field;
   cut_assert_equal_int (POPPLER_FORM_FIELD_BUTTON,
                         poppler_form_field_get_field_type (field));
@@ -161,4 +162,26 @@ test_radio_button (void)
   cut_assert_false (poppler_form_field_button_get_state (field));
   poppler_form_field_button_set_state (field, TRUE);
   cut_assert_true (poppler_form_field_button_get_state (field));
+}
+
+void
+test_normal_text (void)
+{
+  PopplerFormFieldMapping *mapping;
+  PopplerFormField *field;
+
+  load_fields ();
+
+  mapping = g_list_nth_data (fields, 3);
+  field = mapping->field;
+  cut_assert_equal_int (POPPLER_FORM_FIELD_TEXT,
+                        poppler_form_field_get_field_type (field));
+  cut_assert_false (poppler_form_field_is_read_only (field));
+
+  cut_assert_equal_int (POPPLER_FORM_TEXT_NORMAL,
+                        poppler_form_field_text_get_text_type (field));
+  cut_assert_equal_string (NULL, poppler_form_field_text_get_text (field));
+  poppler_form_field_text_set_text (field, "normal text");
+  cut_assert_equal_string ("normal text",
+                           poppler_form_field_text_get_text (field));
 }
