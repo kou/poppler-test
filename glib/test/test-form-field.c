@@ -23,6 +23,7 @@
 #include <gcutter.h>
 
 void test_general (void);
+void test_push_button (void);
 void test_radio_button (void);
 
 static PopplerPage *page;
@@ -99,6 +100,27 @@ test_general (void)
 }
 
 void
+test_push_button (void)
+{
+  PopplerFormFieldMapping *mapping;
+  PopplerFormField *field;
+
+  load_fields ();
+
+  mapping = g_list_nth_data (fields, 3);
+  field = mapping->field;
+  cut_assert_equal_int (POPPLER_FORM_FIELD_BUTTON,
+                        poppler_form_field_get_field_type (field));
+  cut_assert_false (poppler_form_field_is_read_only (field));
+
+  cut_assert_equal_int (POPPLER_FORM_BUTTON_PUSH,
+                        poppler_form_field_button_get_button_type (field));
+  cut_assert_false (poppler_form_field_button_get_state (field));
+  poppler_form_field_button_set_state (field, TRUE);
+  cut_assert_false (poppler_form_field_button_get_state (field));
+}
+
+void
 test_radio_button (void)
 {
   PopplerFormFieldMapping *mapping;
@@ -110,6 +132,8 @@ test_radio_button (void)
   field = mapping->field;
   cut_assert_equal_int (POPPLER_FORM_FIELD_BUTTON,
                         poppler_form_field_get_field_type (field));
+  cut_assert_false (poppler_form_field_is_read_only (field));
+
   cut_assert_equal_int (POPPLER_FORM_BUTTON_RADIO,
                         poppler_form_field_button_get_button_type (field));
   cut_assert_false (poppler_form_field_button_get_state (field));
