@@ -22,6 +22,21 @@
 
 #include <poppler.h>
 
+G_BEGIN_DECLS
+
+typedef void (*PopplerErrorFunc) (int position, char *message, va_list args);
+
 const gchar *poppler_test_get_base_dir (void);
+void         poppler_test_error_to_string_function (GString *string,
+                                                    int      position,
+                                                    char    *message,
+                                                    va_list  args);
+void         poppler_test_error_to_stderr_function (int      position,
+                                                    char    *message,
+                                                    va_list  args);
+
+void         poppler_test_set_error_function       (PopplerErrorFunc func);
+
+G_END_DECLS
 
 #endif

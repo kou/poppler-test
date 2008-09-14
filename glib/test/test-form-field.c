@@ -28,15 +28,26 @@ void test_check_button (void);
 void test_radio_button (void);
 void test_normal_text (void);
 void test_normal_password_text (void);
+void test_multi_line_text (void);
 
 static PopplerPage *page;
 static GList *fields;
+static GString *error_message;
+
+static void
+error_message_collector (int position, char *message, va_list args)
+{
+  poppler_test_error_to_string_function (error_message, position, message, args);
+}
 
 void
 setup (void)
 {
   page = NULL;
   fields = NULL;
+  error_message = g_string_new ("");
+
+  poppler_test_set_error_function (error_message_collector);
 
   cut_set_fixture_data_dir (poppler_test_get_base_dir (),
                             "fixtures",
@@ -52,6 +63,11 @@ teardown (void)
 
   if (fields)
     poppler_page_free_form_field_mapping (fields);
+
+  poppler_test_set_error_function (poppler_test_error_to_stderr_function);
+
+  if (error_message)
+    g_string_free (error_message, TRUE);
 }
 
 static PopplerPage *
@@ -182,10 +198,11 @@ test_normal_text (void)
   cut_assert_equal_int (POPPLER_FORM_TEXT_NORMAL,
                         poppler_form_field_text_get_text_type (field));
 
-  cut_assert_equal_string (NULL, poppler_form_field_text_get_text (field));
+  cut_assert_equal_string_with_free (NULL,
+                                     poppler_form_field_text_get_text (field));
   poppler_form_field_text_set_text (field, "normal text");
-  cut_assert_equal_string ("normal text",
-                           poppler_form_field_text_get_text (field));
+  cut_assert_equal_string_with_free ("normal text",
+                                     poppler_form_field_text_get_text (field));
 
   cut_assert_equal_int (5, poppler_form_field_text_get_max_len (field));
 
@@ -212,10 +229,11 @@ test_normal_password_text (void)
   cut_assert_equal_int (POPPLER_FORM_TEXT_NORMAL,
                         poppler_form_field_text_get_text_type (field));
 
-  cut_assert_equal_string ("password", poppler_form_field_text_get_text (field));
+  cut_assert_equal_string_with_free ("password",
+                                     poppler_form_field_text_get_text (field));
   poppler_form_field_text_set_text (field, "new password");
-  cut_assert_equal_string ("new password",
-                           poppler_form_field_text_get_text (field));
+  cut_assert_equal_string_with_free ("new password",
+                                     poppler_form_field_text_get_text (field));
 
   cut_assert_equal_int (0, poppler_form_field_text_get_max_len (field));
 
@@ -223,4 +241,38 @@ test_normal_password_text (void)
   cut_assert_true (poppler_form_field_text_do_scroll (field));
   cut_assert_false (poppler_form_field_text_is_rich_text (field));
   cut_assert_true (poppler_form_field_text_is_password (field));
+}
+
+void
+test_multi_line_text (void)
+{
+  PopplerFormFieldMapping *mapping;
+  PopplerFormField *field;
+
+  load_fields ();
+
+  mapping = g_list_nth_data (fields, 8);
+  field = mapping->field;
+  cut_assert_equal_int (POPPLER_FORM_FIELD_TEXT,
+                        poppler_form_field_get_field_type (field));
+  cut_assert_true (poppler_form_field_is_read_only (field));
+
+  cut_assert_equal_int (POPPLER_FORM_TEXT_MULTILINE,
+                        poppler_form_field_text_get_text_type (field));
+
+  cut_assert_equal_string_with_free ("text content",
+                                     poppler_form_field_text_get_text (field));
+  poppler_form_field_text_set_text (field, "read-only content");
+  cut_assert_equal_string ("Error: FormWidgetText::setContentCopy "
+                           "called on a read only field\n\n",
+                           error_message->str);
+  cut_assert_equal_string_with_free ("text content",
+                                     poppler_form_field_text_get_text (field));
+
+  cut_assert_equal_int (256, poppler_form_field_text_get_max_len (field));
+
+  cut_assert_true (poppler_form_field_text_do_spell_check (field));
+  cut_assert_true (poppler_form_field_text_do_scroll (field));
+  cut_assert_false (poppler_form_field_text_is_rich_text (field));
+  cut_assert_false (poppler_form_field_text_is_password (field));
 }

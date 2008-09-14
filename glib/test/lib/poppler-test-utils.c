@@ -28,20 +28,51 @@ poppler_test_get_base_dir (void)
   if (base_dir)
     return base_dir;
 
-  dir = g_getenv("BASE_DIR");
+  dir = g_getenv ("BASE_DIR");
   if (!dir)
     dir = ".";
 
-  if (g_path_is_absolute(dir)) {
-    base_dir = g_strdup(dir);
+  if (g_path_is_absolute (dir)) {
+    base_dir = g_strdup (dir);
   } else {
     gchar *current_dir;
 
-    current_dir = g_get_current_dir();
-    base_dir = g_build_filename(current_dir, dir, NULL);
-    g_free(current_dir);
+    current_dir = g_get_current_dir ();
+    base_dir = g_build_filename (current_dir, dir, NULL);
+    g_free (current_dir);
   }
 
   return base_dir;
 }
 
+void
+poppler_test_error_to_string_function (GString *string,
+                                       int      position,
+                                       char    *message,
+                                       va_list  args)
+{
+  if (position >= 0)
+    {
+      g_string_append_printf (string, "Error (%d): ", position);
+    }
+  else
+    {
+      g_string_append (string, "Error: ");
+    }
+
+  g_string_append_vprintf (string, message, args);
+  g_string_append (string, "\n");
+}
+
+void
+poppler_test_error_to_stderr_function (int      position,
+                                       char    *message,
+                                       va_list  args)
+{
+  GString *string;
+
+  string = g_string_new (NULL);
+  poppler_test_error_to_string_function (string, position, message, args);
+  g_printerr ("%s", string->str);
+  g_string_free (string, TRUE);
+}

@@ -17,4 +17,5 @@ LIBS =						\
 
 libpoppler_test_utils_la_SOURCES =	\
 	poppler-test-utils.c		\
-	poppler-test-utils.h
+	poppler-test-utils.h		\
+	poppler-test-wrapper.cc
