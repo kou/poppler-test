@@ -180,8 +180,16 @@ test_normal_text (void)
 
   cut_assert_equal_int (POPPLER_FORM_TEXT_NORMAL,
                         poppler_form_field_text_get_text_type (field));
+
   cut_assert_equal_string (NULL, poppler_form_field_text_get_text (field));
   poppler_form_field_text_set_text (field, "normal text");
   cut_assert_equal_string ("normal text",
                            poppler_form_field_text_get_text (field));
+
+  cut_assert_equal_int (5, poppler_form_field_text_get_max_len (field));
+
+  cut_assert_true (poppler_form_field_text_do_spell_check (field));
+  cut_assert_true (poppler_form_field_text_do_scroll (field));
+  cut_assert_false (poppler_form_field_text_is_rich_text (field));
+  cut_assert_false (poppler_form_field_text_is_password (field));
 }
