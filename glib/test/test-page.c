@@ -128,5 +128,5 @@ test_get_form_field_mapping (void)
   page = load_page ("form.pdf", 0);
 
   fields = poppler_page_get_form_field_mapping (page);
-  cut_assert_equal_int (6, g_list_length (fields));
+  cut_assert_equal_int (8, g_list_length (fields));
 }
