@@ -29,6 +29,7 @@ void test_radio_button (void);
 void test_normal_text (void);
 void test_normal_password_text (void);
 void test_multi_line_text (void);
+void test_file_select_text (void);
 
 static PopplerPage *page;
 static GList *fields;
@@ -270,6 +271,40 @@ test_multi_line_text (void)
                                      poppler_form_field_text_get_text (field));
 
   cut_assert_equal_int (256, poppler_form_field_text_get_max_len (field));
+
+  cut_assert_true (poppler_form_field_text_do_spell_check (field));
+  cut_assert_false (poppler_form_field_text_do_scroll (field));
+  cut_assert_false (poppler_form_field_text_is_rich_text (field));
+  cut_assert_false (poppler_form_field_text_is_password (field));
+}
+
+void
+test_file_select_text (void)
+{
+  PopplerFormFieldMapping *mapping;
+  PopplerFormField *field;
+
+  load_fields ();
+
+  mapping = g_list_nth_data (fields, 8);
+  field = mapping->field;
+  cut_assert_equal_int (POPPLER_FORM_FIELD_TEXT,
+                        poppler_form_field_get_field_type (field));
+  cut_assert_true (poppler_form_field_is_read_only (field));
+
+  cut_assert_equal_int (POPPLER_FORM_TEXT_FILE_SELECT,
+                        poppler_form_field_text_get_text_type (field));
+
+  cut_assert_equal_string_with_free (NULL,
+                                     poppler_form_field_text_get_text (field));
+  poppler_form_field_text_set_text (field, "/tmp/sample.pdf");
+  cut_assert_equal_string ("Error: FormWidgetText::setContentCopy "
+                           "called on a read only field\n\n",
+                           error_message->str);
+  cut_assert_equal_string_with_free ("/tmp/sample.pdf",
+                                     poppler_form_field_text_get_text (field));
+
+  cut_assert_equal_int (0, poppler_form_field_text_get_max_len (field));
 
   cut_assert_true (poppler_form_field_text_do_spell_check (field));
   cut_assert_true (poppler_form_field_text_do_scroll (field));
