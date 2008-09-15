@@ -31,6 +31,7 @@ void test_normal_password_text (void);
 void test_multi_line_text (void);
 void test_file_select_text (void);
 void test_combo_choice (void);
+void test_list_choice (void);
 
 static PopplerPage *page;
 static GList *fields;
@@ -352,3 +353,64 @@ test_combo_choice (void)
                                      poppler_form_field_choice_get_text (field));
 }
 
+void
+test_list_choice (void)
+{
+  PopplerFormFieldMapping *mapping;
+  PopplerFormField *field;
+
+  load_fields ();
+
+  mapping = g_list_nth_data (fields, 6);
+  field = mapping->field;
+  cut_assert_equal_int (POPPLER_FORM_FIELD_CHOICE,
+                        poppler_form_field_get_field_type (field));
+  cut_assert_true (poppler_form_field_is_read_only (field));
+
+  cut_assert_equal_int (POPPLER_FORM_CHOICE_LIST,
+                        poppler_form_field_choice_get_choice_type (field));
+
+  cut_assert_false (poppler_form_field_choice_is_editable (field));
+  cut_assert_true (poppler_form_field_choice_can_select_multiple (field));
+  cut_assert_true (poppler_form_field_choice_do_spell_check (field));
+  cut_assert_false (poppler_form_field_choice_commit_on_change (field));
+
+  cut_assert_equal_int (1, poppler_form_field_choice_get_n_items (field));
+  cut_assert_equal_string_with_free ("first item",
+                                     poppler_form_field_choice_get_item (field,
+                                                                         0));
+
+  cut_assert_false (poppler_form_field_choice_is_item_selected (field, 0));
+
+  poppler_form_field_choice_select_item (field, 0);
+  cut_assert_equal_string ("Error: FormWidgetChoice::select called "
+                           "on a read only field\n\n",
+                           error_message->str);
+  cut_assert_false (poppler_form_field_choice_is_item_selected (field, 0));
+  g_string_truncate (error_message, 0);
+
+  poppler_form_field_choice_unselect_all (field);
+  cut_assert_equal_string ("Error: FormWidgetChoice::deselectAll called "
+                           "on a read only field\n\n",
+                           error_message->str);
+  cut_assert_false (poppler_form_field_choice_is_item_selected (field, 0));
+  g_string_truncate (error_message, 0);
+
+  poppler_form_field_choice_toggle_item (field, 0);
+  cut_assert_equal_string ("Error: FormWidgetChoice::toggle called "
+                           "on a read only field\n\n",
+                           error_message->str);
+  cut_assert_false (poppler_form_field_choice_is_item_selected (field, 0));
+  g_string_truncate (error_message, 0);
+
+  cut_assert_equal_string_with_free (NULL,
+                                     poppler_form_field_choice_get_text (field));
+  poppler_form_field_choice_set_text (field, "text");
+  cut_assert_equal_string ("Error: FormFieldChoice::getEditChoice called "
+                           "on a non-editable choice\n\n"
+                           "Error: FormWidgetText::setEditChoice called "
+                           "on a read only field\n\n",
+                           error_message->str);
+  cut_assert_equal_string_with_free (NULL,
+                                     poppler_form_field_choice_get_text (field));
+}
