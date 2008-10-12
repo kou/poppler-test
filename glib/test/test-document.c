@@ -26,6 +26,7 @@ void test_new_from_file (void);
 void test_new_from_data (void);
 void test_save (void);
 void test_save_a_copy (void);
+void test_property (void);
 
 static PopplerDocument *document;
 
@@ -159,4 +160,203 @@ test_save_a_copy (void)
   document = poppler_document_new_from_file (copy_uri, NULL, &error);
   gcut_assert_error (error);
   cut_assert_equal_int (3, poppler_document_get_n_pages (document));
+}
+
+static gchar *
+inspect_property (const gchar *title,
+                  const gchar *format,
+                  const gchar *author,
+                  const gchar *subject,
+                  const gchar *keywords,
+                  GTime creation_date,
+                  GTime mod_date,
+                  const gchar *creator,
+                  const gchar *producer,
+                  const gchar *linearized,
+                  PopplerPageMode mode,
+                  PopplerPageLayout layout,
+                  PopplerViewerPreferences viewer_preferences,
+                  PopplerPermissions permissions)
+{
+  GString *inspected;
+  gchar *inspected_mode, *inspected_layout;
+  gchar *inspected_viewer_preferences, *inspected_permissions;
+
+  inspected_mode = gcut_enum_inspect (POPPLER_TYPE_PAGE_MODE, mode);
+  inspected_layout = gcut_enum_inspect (POPPLER_TYPE_PAGE_LAYOUT, layout);
+  inspected_viewer_preferences =
+    gcut_flags_inspect (POPPLER_TYPE_VIEWER_PREFERENCES, viewer_preferences);
+  inspected_permissions =
+    gcut_flags_inspect (POPPLER_TYPE_PERMISSIONS, permissions);
+
+  inspected = g_string_new (NULL);
+  g_string_append_printf (inspected,
+                          "{"
+                          "title=<%s>, "
+                          "format=<%s>, "
+                          "author=<%s>, "
+                          "subject=<%s>, "
+                          "keywords=<%s>, "
+                          "creation-date=<%u>, "
+                          "mod-date=<%u>, "
+                          "creator=<%s>, "
+                          "producer=<%s>, "
+                          "linearized=<%s>, "
+                          "mode=<%s>, "
+                          "layout=<%s>, "
+                          "viewer-preferences=<%s>, "
+                          "permissions=<%s>"
+                          "}",
+                          title,
+                          format,
+                          author,
+                          subject,
+                          keywords,
+                          creation_date,
+                          mod_date,
+                          creator,
+                          producer,
+                          linearized,
+                          inspected_mode,
+                          inspected_layout,
+                          inspected_viewer_preferences,
+                          inspected_permissions);
+  g_free(inspected_mode);
+  g_free(inspected_layout);
+  g_free(inspected_viewer_preferences);
+  g_free(inspected_permissions);
+
+  return g_string_free (inspected, FALSE);
+}
+
+static void
+cut_poppler_assert_equal_property (const gchar *title,
+                                   const gchar *format,
+                                   const gchar *author,
+                                   const gchar *subject,
+                                   const gchar *keywords,
+                                   GTime creation_date,
+                                   GTime mod_date,
+                                   const gchar *creator,
+                                   const gchar *producer,
+                                   const gchar *linearized,
+                                   PopplerPageMode mode,
+                                   PopplerPageLayout layout,
+                                   PopplerViewerPreferences viewer_preferences,
+                                   PopplerPermissions permissions,
+                                   PopplerDocument *document)
+{
+  gchar *actual_title;
+  gchar *actual_format;
+  gchar *actual_author;
+  gchar *actual_subject;
+  gchar *actual_keywords;
+  GTime actual_creation_date;
+  GTime actual_mod_date;
+  gchar *actual_creator;
+  gchar *actual_producer;
+  gchar *actual_linearized;
+  PopplerPageMode actual_mode;
+  PopplerPageLayout actual_layout;
+  PopplerViewerPreferences actual_viewer_preferences;
+  PopplerPermissions actual_permissions;
+
+  g_object_get (document,
+		"title", &actual_title,
+		"format", &actual_format,
+		"author", &actual_author,
+		"subject", &actual_subject,
+		"keywords", &actual_keywords,
+		"creation-date", &actual_creation_date,
+		"mod-date", &actual_mod_date,
+		"creator", &actual_creator,
+		"producer", &actual_producer,
+		"linearized", &actual_linearized,
+		"page-mode", &actual_mode,
+		"page-layout", &actual_layout,
+		"viewer-preferences", &actual_viewer_preferences,
+		"permissions", &actual_permissions,
+		NULL);
+
+  if (cut_equal_string (title, actual_title) &&
+      cut_equal_string (format, actual_format) &&
+      cut_equal_string (author, actual_author) &&
+      cut_equal_string (subject, actual_subject) &&
+      cut_equal_string (keywords, actual_keywords) &&
+      creation_date == actual_creation_date &&
+      mod_date == actual_mod_date &&
+      cut_equal_string (creator, actual_creator) &&
+      cut_equal_string (producer, actual_producer) &&
+      cut_equal_string (linearized, actual_linearized) &&
+      mode == actual_mode &&
+      layout == actual_layout &&
+      viewer_preferences == actual_viewer_preferences &&
+      permissions == actual_permissions)
+    {
+      cut_test_pass ();
+    }
+  else
+    {
+      gchar *inspected_expected;
+      gchar *inspected_actual;
+      const gchar *message;
+
+      inspected_expected = inspect_property (title,
+                                             format,
+                                             author,
+                                             subject,
+                                             keywords,
+                                             creation_date,
+                                             mod_date,
+                                             creator,
+                                             producer,
+                                             linearized,
+                                             mode,
+                                             layout,
+                                             viewer_preferences,
+                                             permissions);
+      inspected_actual = inspect_property (actual_title,
+                                           actual_format,
+                                           actual_author,
+                                           actual_subject,
+                                           actual_keywords,
+                                           actual_creation_date,
+                                           actual_mod_date,
+                                           actual_creator,
+                                           actual_producer,
+                                           actual_linearized,
+                                           actual_mode,
+                                           actual_layout,
+                                           actual_viewer_preferences,
+                                           actual_permissions);
+      message = cut_take_printf( "expected: <%s>\n"
+                                 "  actual: <%s>",
+                                 inspected_expected, inspected_actual);
+      message = cut_append_diff (message, inspected_expected, inspected_actual);
+      cut_fail("%s", message);
+    }
+}
+
+void
+test_property (void)
+{
+  GError *error = NULL;
+  const gchar *uri;
+  gchar *copy_path;
+  const gchar *copy_uri;
+
+  uri = build_uri ("property.pdf");
+  document = poppler_document_new_from_file (uri, NULL, &error);
+  gcut_assert_error (error);
+
+  cut_poppler_assert_equal_property ("Property Document", "PDF-1.4", NULL,
+                                     "property", "property, test",
+                                     1223783560, 0,
+                                     "Writer", "OpenOffice.org 2.4",
+                                     "No",
+                                     POPPLER_PAGE_MODE_USE_THUMBS,
+                                     POPPLER_PAGE_LAYOUT_UNSET,
+                                     0,
+                                     POPPLER_PERMISSIONS_FULL,
+                                     document);
 }
