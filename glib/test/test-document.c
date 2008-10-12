@@ -178,7 +178,7 @@ inspect_property (const gchar *title,
                   PopplerViewerPreferences viewer_preferences,
                   PopplerPermissions permissions)
 {
-  GString *inspected;
+  gchar *inspected;
   gchar *inspected_mode, *inspected_layout;
   gchar *inspected_viewer_preferences, *inspected_permissions;
 
@@ -189,48 +189,47 @@ inspect_property (const gchar *title,
   inspected_permissions =
     gcut_flags_inspect (POPPLER_TYPE_PERMISSIONS, permissions);
 
-  inspected = g_string_new (NULL);
-  g_string_append_printf (inspected,
-                          "{"
-                          "title=<%s>, "
-                          "format=<%s>, "
-                          "author=<%s>, "
-                          "subject=<%s>, "
-                          "keywords=<%s>, "
-                          "creation-date=<%u>, "
-                          "mod-date=<%u>, "
-                          "creator=<%s>, "
-                          "producer=<%s>, "
-                          "linearized=<%s>, "
-                          "mode=<%s>, "
-                          "layout=<%s>, "
-                          "viewer-preferences=<%s>, "
-                          "permissions=<%s>"
-                          "}",
-                          title,
-                          format,
-                          author,
-                          subject,
-                          keywords,
-                          creation_date,
-                          mod_date,
-                          creator,
-                          producer,
-                          linearized,
-                          inspected_mode,
-                          inspected_layout,
-                          inspected_viewer_preferences,
-                          inspected_permissions);
-  g_free(inspected_mode);
-  g_free(inspected_layout);
-  g_free(inspected_viewer_preferences);
-  g_free(inspected_permissions);
+  inspected = g_strdup_printf (inspected,
+                               "{"
+                               "title=<%s>, "
+                               "format=<%s>, "
+                               "author=<%s>, "
+                               "subject=<%s>, "
+                               "keywords=<%s>, "
+                               "creation-date=<%u>, "
+                               "mod-date=<%u>, "
+                               "creator=<%s>, "
+                               "producer=<%s>, "
+                               "linearized=<%s>, "
+                               "mode=<%s>, "
+                               "layout=<%s>, "
+                               "viewer-preferences=<%s>, "
+                               "permissions=<%s>"
+                               "}",
+                               title,
+                               format,
+                               author,
+                               subject,
+                               keywords,
+                               creation_date,
+                               mod_date,
+                               creator,
+                               producer,
+                               linearized,
+                               inspected_mode,
+                               inspected_layout,
+                               inspected_viewer_preferences,
+                               inspected_permissions);
+  g_free (inspected_mode);
+  g_free (inspected_layout);
+  g_free (inspected_viewer_preferences);
+  g_free (inspected_permissions);
 
-  return g_string_free (inspected, FALSE);
+  return inspected;
 }
 
 #define cut_poppler_assert_equal_property(...)                          \
-  cut_trace(cut_poppler_assert_equal_property_helper(__VA_ARGS__))
+  cut_trace (cut_poppler_assert_equal_property_helper (__VA_ARGS__))
 
 static void
 cut_poppler_assert_equal_property_helper (const gchar *title,
@@ -332,11 +331,13 @@ cut_poppler_assert_equal_property_helper (const gchar *title,
                                            actual_layout,
                                            actual_viewer_preferences,
                                            actual_permissions);
-      message = cut_take_printf( "expected: <%s>\n"
+      message = cut_take_printf ("expected: <%s>\n"
                                  "  actual: <%s>",
                                  inspected_expected, inspected_actual);
       message = cut_append_diff (message, inspected_expected, inspected_actual);
-      cut_fail("%s", message);
+      g_free (inspected_expected);
+      g_free (inspected_actual);
+      cut_fail ("%s", message);
     }
 }
 
