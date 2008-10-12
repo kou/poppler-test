@@ -21,6 +21,9 @@
 #include "lib/poppler-test-utils.h"
 
 #include <gcutter.h>
+#ifdef CUT_SUPPORT_GDK_PIXBUF
+#  include <gdkcutter-pixbuf.h>
+#endif
 
 void test_get_size (void);
 void test_index_single_page (void);
@@ -28,9 +31,13 @@ void test_index_multi_pages (void);
 void test_get_text (void);
 void test_get_form_field_mapping (void);
 void test_transition (void);
+void test_render_pixbuf (void);
 
 static PopplerPage *page;
 static PopplerPageTransition *transition;
+#ifdef CUT_SUPPORT_GDK_PIXBUF
+static GdkPixbuf *expected_pixbuf, *actual_pixbuf;
+#endif
 static GList *fields;
 
 void
@@ -38,11 +45,14 @@ setup (void)
 {
   page = NULL;
   transition = NULL;
+#ifdef CUT_SUPPORT_GDK_PIXBUF
+  expected_pixbuf = NULL;
+  actual_pixbuf = NULL;
+#endif
   fields = NULL;
 
   cut_set_fixture_data_dir (poppler_test_get_base_dir (),
                             "fixtures",
-                            "pdf",
                             NULL);
 }
 
@@ -54,6 +64,13 @@ teardown (void)
 
   if (transition)
     poppler_page_transition_free (transition);
+
+#ifdef CUT_SUPPORT_GDK_PIXBUF
+  if (expected_pixbuf)
+    g_object_unref (expected_pixbuf);
+  if (actual_pixbuf)
+    g_object_unref (actual_pixbuf);
+#endif
 
   if (fields)
     poppler_page_free_form_field_mapping (fields);
@@ -67,7 +84,7 @@ load_page (const gchar *fixture_data_component, gint n)
   GError *error = NULL;
   gchar *uri, *path;
 
-  path = cut_build_fixture_data_path (fixture_data_component, NULL);
+  path = cut_build_fixture_data_path ("pdf", fixture_data_component, NULL);
   uri = g_strconcat ("file://", path, NULL);
   g_free (path);
 
@@ -246,4 +263,47 @@ test_transition (void)
                                        1.0,
                                        0.0,
                                        transition);
+}
+
+#if defined(POPPLER_WITH_GDK) && defined(CUT_SUPPORT_GDK_PIXBUF)
+static GdkPixbuf *
+load_pixbuf (const gchar *path)
+{
+  GdkPixbuf *pixbuf;
+  GError *error = NULL;
+  gchar *pixbuf_path;
+
+  pixbuf_path = cut_build_fixture_data_path ("png", path, NULL);
+  pixbuf = gdk_pixbuf_new_from_file (pixbuf_path, &error);
+  g_free (pixbuf_path);
+
+  gcut_assert_error (error);
+
+  return pixbuf;
+}
+#endif
+
+void
+test_render_pixbuf (void)
+{
+#if defined(POPPLER_WITH_GDK) && defined(CUT_SUPPORT_GDK_PIXBUF)
+  double width, height;
+
+  page = load_page ("shape.pdf", 0);
+  poppler_page_get_size (page, &width, &height);
+
+  expected_pixbuf = load_pixbuf ("shape.png");
+  actual_pixbuf = gdk_pixbuf_new (gdk_pixbuf_get_colorspace (expected_pixbuf),
+                                  gdk_pixbuf_get_has_alpha (expected_pixbuf),
+                                  gdk_pixbuf_get_bits_per_sample (expected_pixbuf),
+                                  width,
+                                  height);
+  gdk_pixbuf_fill (actual_pixbuf, 0xffffff00);
+  poppler_page_render_to_pixbuf (page,
+                                 0, 0, width, height, 1, 0,
+                                 actual_pixbuf);
+  gdkcut_pixbuf_assert_equal (expected_pixbuf, actual_pixbuf, 0x04);
+#else
+  cut_omit("gdk-pixbuf support isn't available");
+#endif
 }

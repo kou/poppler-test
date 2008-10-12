@@ -12,17 +12,19 @@ noinst_LTLIBRARIES =		\
 	test-form-field.la
 endif
 
-INCLUDES =			\
-	-I$(top_srcdir)		\
-	-I$(top_srcdir)/glib	\
-	$(cairo_includes)	\
-	$(POPPLER_GLIB_CFLAGS)	\
-	$(GDK_CFLAGS)		\
-	$(GCUTTER_CFLAGS)
+INCLUDES =				\
+	-I$(top_srcdir)			\
+	-I$(top_srcdir)/glib		\
+	$(cairo_includes)		\
+	$(POPPLER_GLIB_CFLAGS)		\
+	$(GDK_CFLAGS)			\
+	$(GCUTTER_CFLAGS)		\
+	$(GDKCUTTER_PIXBUF_CFLAGS)
 
 LIBS =							\
 	$(top_builddir)/glib/libpoppler-glib.la		\
 	$(GCUTTER_LIBS)					\
+	$(GDKCUTTER_PIXBUF_LIBS)			\
 	$(builddir)/lib/libpoppler-test-utils.la
 
 AM_LDFLAGS =			\

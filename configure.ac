@@ -295,14 +295,19 @@ dnl
 if test x$enable_poppler_glib = xyes; then
   m4_ifdef([AC_CHECK_GCUTTER],
            [AC_CHECK_GCUTTER(>= 1.0.5)],
-           [ac_cv_use_cutter="no"])
+           [ac_cv_use_gcutter="no"])
+  m4_ifdef([AC_CHECK_GDKCUTTER_PIXBUF],
+           [AC_CHECK_GDKCUTTER_PIXBUF(>= 1.0.5)],
+           [ac_cv_use_gdkcutter_pixbuf="no"])
 
-  if test "$ac_cv_use_cutter" != "no"; then
+  if test "$ac_cv_use_gcutter" != "no"; then
     enable_cutter="yes"
   else
     enable_cutter="no"
   fi
   AM_CONDITIONAL([WITH_CUTTER], [test "$enable_cutter" == "yes"])
+  AM_CONDITIONAL([WITH_GDKCUTTER_PIXBUF],
+                 [test "$ac_cv_use_gdkcutter_pixbuf" != "no"])
   if test "$enable_cutter" == "yes"; then
     AC_DEFINE(WITH_CUTTER, 1, [Define to 1 if you use Cutter])
   fi
