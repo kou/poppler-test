@@ -297,8 +297,13 @@ if test x$enable_poppler_glib = xyes; then
            [AC_CHECK_GCUTTER],
            [ac_cv_use_cutter="no"])
 
-  AM_CONDITIONAL([WITH_CUTTER], [test "$ac_cv_use_cutter" != "no"])
   if test "$ac_cv_use_cutter" != "no"; then
+    enable_cutter="yes"
+  else
+    enable_cutter="no"
+  fi
+  AM_CONDITIONAL([WITH_CUTTER], [test "$enable_cutter" == "yes"])
+  if test "$enable_cutter" == "yes"; then
     AC_DEFINE(WITH_CUTTER, 1, [Define to 1 if you use Cutter])
   fi
 fi
@@ -485,6 +490,7 @@ echo "  use libjpeg:        $enable_libjpeg"
 echo "  use zlib:           $enable_zlib"
 echo "  use libopenjpeg:    $enable_libopenjpeg"
 echo "  command line utils: $enable_utils"
+echo "  use cutter:         $enable_cutter"
 echo ""
 
 if test x$enable_splash_output = xno -a x$enable_cairo_output = xno; then
