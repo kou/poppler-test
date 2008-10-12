@@ -27,14 +27,17 @@ void test_index_single_page (void);
 void test_index_multi_pages (void);
 void test_get_text (void);
 void test_get_form_field_mapping (void);
+void test_transition (void);
 
 static PopplerPage *page;
+static PopplerPageTransition *transition;
 static GList *fields;
 
 void
 setup (void)
 {
   page = NULL;
+  transition = NULL;
   fields = NULL;
 
   cut_set_fixture_data_dir (poppler_test_get_base_dir (),
@@ -48,6 +51,9 @@ teardown (void)
 {
   if (page)
     g_object_unref (page);
+
+  if (transition)
+    poppler_page_transition_free (transition);
 
   if (fields)
     poppler_page_free_form_field_mapping (fields);
@@ -129,4 +135,115 @@ test_get_form_field_mapping (void)
 
   fields = poppler_page_get_form_field_mapping (page);
   cut_assert_not_null (fields);
+}
+
+static gchar *
+inspect_transition (PopplerPageTransitionType type,
+                    PopplerPageTransitionAlignment alignment,
+                    PopplerPageTransitionDirection direction,
+                    gint duration,
+                    gint angle,
+                    gdouble scale,
+                    gdouble rectangular)
+{
+  gchar *inspected;
+  gchar *inspected_type, *inspected_alignment, *inspected_direction;
+
+  inspected_type = gcut_enum_inspect (POPPLER_TYPE_PAGE_TRANSITION_TYPE, type);
+  inspected_alignment =
+    gcut_enum_inspect (POPPLER_TYPE_PAGE_TRANSITION_ALIGNMENT, alignment);
+  inspected_direction =
+    gcut_enum_inspect (POPPLER_TYPE_PAGE_TRANSITION_DIRECTION, direction);
+
+  inspected = g_strdup_printf ("{"
+                               "type=<%s>, "
+                               "alignment=<%s>, "
+                               "direction=<%s>, "
+                               "duration=<%d>, "
+                               "angle=<%d>, "
+                               "scale=<%g>, "
+                               "rectangular=<%g>, "
+                               "}",
+                               inspected_type,
+                               inspected_alignment,
+                               inspected_direction,
+                               duration,
+                               angle,
+                               scale,
+                               rectangular);
+  g_free (inspected_type);
+  g_free (inspected_alignment);
+  g_free (inspected_direction);
+
+  return inspected;
+}
+
+#define cut_poppler_assert_equal_transition(...)                       \
+  cut_trace (cut_poppler_assert_equal_transition_helper (__VA_ARGS__))
+
+static void
+cut_poppler_assert_equal_transition_helper (PopplerPageTransitionType type,
+                                            PopplerPageTransitionAlignment alignment,
+                                            PopplerPageTransitionDirection direction,
+                                            gint duration,
+                                            gint angle,
+                                            gdouble scale,
+                                            gdouble rectangular,
+                                            PopplerPageTransition *transition)
+{
+  if (type == transition->type &&
+      alignment == transition->alignment &&
+      direction == transition->direction &&
+      duration == transition->duration &&
+      angle == transition->angle &&
+      cut_equal_double(scale, transition->scale, 0.1) &&
+      cut_equal_double(rectangular, transition->rectangular, 0.1))
+    {
+      cut_test_pass();
+    }
+  else
+    {
+      const gchar *message;
+      gchar *inspected_expected, *inspected_actual;
+
+      inspected_expected = inspect_transition (type,
+                                               alignment,
+                                               direction,
+                                               duration,
+                                               angle,
+                                               scale,
+                                               rectangular);
+      inspected_actual = inspect_transition (transition->type,
+                                             transition->alignment,
+                                             transition->direction,
+                                             transition->duration,
+                                             transition->angle,
+                                             transition->scale,
+                                             transition->rectangular);
+      message = cut_take_printf ("expected: <%s>\n"
+                                 "  actual: <%s>",
+                                 inspected_expected, inspected_actual);
+      message = cut_append_diff (message, inspected_expected, inspected_actual);
+      g_free (inspected_expected);
+      g_free (inspected_actual);
+      cut_fail ("%s", message);
+    }
+}
+
+void
+test_transition (void)
+{
+  page = load_page ("slide.pdf", 1);
+
+  transition = poppler_page_get_transition (page);
+  cut_assert_not_null (transition);
+
+  cut_poppler_assert_equal_transition (POPPLER_PAGE_TRANSITION_WIPE,
+                                       POPPLER_PAGE_TRANSITION_HORIZONTAL,
+                                       POPPLER_PAGE_TRANSITION_INWARD,
+                                       1,
+                                       180,
+                                       1.0,
+                                       0.0,
+                                       transition);
 }
