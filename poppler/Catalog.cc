@@ -10,6 +10,9 @@
 //
 // Modified under the Poppler project - http://poppler.freedesktop.org
 //
+// All changes made under the Poppler project to this file are licensed
+// under GPL version 2 or later
+//
 // Copyright (C) 2005 Kristian Høgsberg <krh@redhat.com>
 // Copyright (C) 2005-2007 Albert Astals Cid <aacid@kde.org>
 // Copyright (C) 2005 Jeff Muizelaar <jrmuizel@nit.ca>
@@ -446,12 +449,20 @@ GooString *Catalog::getJS(int i)
     obj.free();
     return 0;
   }
-  if (!obj.dictLookup("JS", &obj2)->isString()) {
-    obj2.free();
-    obj.free();
-    return 0;
+  obj.dictLookup("JS", &obj2);
+  GooString *js = 0;
+  if (obj2.isString()) {
+    js = new GooString(obj2.getString());
   }
-  GooString *js = new GooString(obj2.getString());
+  else if (obj2.isStream()) {
+    Stream *stream = obj2.getStream();
+    js = new GooString();
+    stream->reset();
+    int i;
+    while ((i = stream->getChar()) != EOF) {
+      js->append((char)i);
+    }
+  }
   obj2.free();
   obj.free();
   return js;

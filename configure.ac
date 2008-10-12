@@ -1,5 +1,5 @@
 AC_PREREQ(2.59)
-AC_INIT(poppler, 0.9.0)
+AC_INIT(poppler, 0.10.0)
 AM_INIT_AUTOMAKE([foreign])
 AM_CONFIG_HEADER(config.h)
 AM_CONFIG_HEADER(poppler/poppler-config.h)
@@ -27,7 +27,7 @@ dnl Check for OS specific flags
 win32_libs=""
 create_shared_lib=""
 case "$host_os" in
-  mingw|mingw32)
+  mingw*)
     win32_libs="-lgdi32"
     create_shared_lib="-no-undefined"
   ;;
@@ -221,6 +221,7 @@ if test x$enable_cairo_output = xyes; then
   AC_DEFINE(HAVE_CAIRO)
   CAIRO_FEATURE="#define POPPLER_HAS_CAIRO 1"
   CAIRO_REQ="cairo"
+  AC_CHECK_HEADERS(fcntl.h sys/mman.h sys/stat.h)
 else
   CAIRO_FEATURE="#undef POPPLER_HAS_CAIRO"
   CAIRO_REQ=""

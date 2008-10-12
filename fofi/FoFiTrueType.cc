@@ -17,6 +17,7 @@
 // Copyright (C) 2007 Koji Otani <sho@bbr.jp>
 // Copyright (C) 2007 Carlos Garcia Campos <carlosgc@gnome.org>
 // Copyright (C) 2008 Albert Astals Cid <aacid@kde.org>
+// Copyright (C) 2008 Tomas Are Haavet <tomasare@gmail.com>
 //
 // To see a description of the changes please see the Changelog file that
 // came with your tarball or type make ChangeLog if you are building from git
@@ -353,7 +354,7 @@ Gushort FoFiTrueType::mapCodeToGID(int i, Guint c) {
   pos = cmaps[i].offset;
   switch (cmaps[i].fmt) {
   case 0:
-    if (c >= cmaps[i].len - 6) {
+    if (c + 6 >= (Guint)cmaps[i].len) {
       return 0;
     }
     gid = getU8(cmaps[i].offset + 6 + c, &ok);
@@ -898,6 +899,10 @@ void FoFiTrueType::writeTTF(FoFiOutputFunc outputFunc,
   int pos, i, j, k, n;
 
   if (openTypeCFF) {
+    return;
+  }
+
+  if (tables == NULL) {
     return;
   }
 
@@ -1907,8 +1912,8 @@ void FoFiTrueType::parse() {
     pos += 16;
   }
   nTables -= wrongTables;
-  tables = (TrueTypeTable *)greallocn(tables, nTables, sizeof(TrueTypeTable));
-  if (!parsedOk) {
+  tables = (TrueTypeTable *)greallocn_checkoverflow(tables, nTables, sizeof(TrueTypeTable));
+  if (!parsedOk || tables == NULL) {
     return;
   }
 

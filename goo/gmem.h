@@ -14,7 +14,7 @@
 // under GPL version 2 or later
 //
 // Copyright (C) 2005 Takashi Iwai <tiwai@suse.de>
-// Copyright (C) 2007 Albert Astals Cid <aacid@kde.org>
+// Copyright (C) 2007, 2008 Albert Astals Cid <aacid@kde.org>
 // Copyright (C) 2008 Jonathan Kew <jonathan_kew@sil.org>
 //
 // To see a description of the changes please see the Changelog file that
@@ -71,6 +71,7 @@ extern void *grealloc(void *p, size_t size) GMEM_EXCEP;
 extern void *gmallocn(int nObjs, int objSize) GMEM_EXCEP;
 extern void *gmallocn_checkoverflow(int nObjs, int objSize) GMEM_EXCEP;
 extern void *greallocn(void *p, int nObjs, int objSize) GMEM_EXCEP;
+extern void *greallocn_checkoverflow(void *p, int nObjs, int objSize) GMEM_EXCEP;
 
 /*
  * Same as free, but checks for and ignores NULL pointers.

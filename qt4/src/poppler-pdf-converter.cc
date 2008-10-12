@@ -1,5 +1,6 @@
 /* poppler-pdf-converter.cc: qt4 interface to poppler
  * Copyright (C) 2008, Pino Toscano <pino@kde.org>
+ * Copyright (C) 2008, Albert Astals Cid <aacid@kde.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,6 +22,8 @@
 #include "poppler-private.h"
 #include "poppler-converter-private.h"
 #include "poppler-qiodeviceoutstream-private.h"
+
+#include <QtCore/QFile>
 
 namespace Poppler {
 
@@ -72,18 +75,30 @@ bool PDFConverter::convert()
 	if (!dev)
 		return false;
 
+	bool deleteFile = false;
+	if (QFile *file = qobject_cast<QFile*>(dev))
+		deleteFile = !file->exists();
+
+	bool success;
 	QIODeviceOutStream stream(dev);
 	if (d->opts & WithChanges)
 	{
-		d->document->doc->saveAs(&stream);
+		success = d->document->doc->saveAs(&stream);
 	}
 	else
 	{
-		d->document->doc->saveWithoutChangesAs(&stream);
+		success = d->document->doc->saveWithoutChangesAs(&stream);
 	}
 	d->closeDevice();
+	if (!success)
+	{
+		if (deleteFile)
+		{
+			qobject_cast<QFile*>(dev)->remove();
+		}
+	}
 
-	return true;
+	return success;
 }
 
 }
