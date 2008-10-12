@@ -27,8 +27,12 @@ void test_new_from_data (void);
 void test_save (void);
 void test_save_a_copy (void);
 void test_property (void);
+void test_font (void);
 
 static PopplerDocument *document;
+static PopplerFontInfo *font_info;
+static GList *expected_font_names;
+static GList *actual_font_names;
 
 static gchar *tmp_base_dir;
 static gchar *tmp_dir;
@@ -37,6 +41,10 @@ void
 setup (void)
 {
   document = NULL;
+  font_info = NULL;
+
+  expected_font_names = NULL;
+  actual_font_names = NULL;
 
   cut_set_fixture_data_dir (poppler_test_get_base_dir (),
                             "fixtures",
@@ -55,6 +63,13 @@ teardown (void)
 {
   if (document)
     g_object_unref (document);
+  if (font_info)
+    g_object_unref (font_info);
+
+  if (expected_font_names)
+    gcut_list_string_free (expected_font_names);
+  if (actual_font_names)
+    gcut_list_string_free (actual_font_names);
 
   if (tmp_dir)
     g_free (tmp_dir);
@@ -77,6 +92,21 @@ build_uri (const gchar *fixture_data_component)
 
   return cut_take_string (uri);
 }
+
+static PopplerDocument *
+load_document (const gchar *fixture_data_component)
+{
+  PopplerDocument *document;
+  GError *error = NULL;
+  const gchar *uri;
+
+  uri = build_uri (fixture_data_component);
+  document = poppler_document_new_from_file (uri, NULL, &error);
+  gcut_assert_error (error);
+
+  return document;
+}
+
 
 void
 test_new_from_file (void)
@@ -114,13 +144,10 @@ void
 test_save (void)
 {
   GError *error = NULL;
-  const gchar *uri;
   gchar *output_path;
   const gchar *output_uri;
 
-  uri = build_uri ("multi-pages.pdf");
-  document = poppler_document_new_from_file (uri, NULL, &error);
-  gcut_assert_error (error);
+  document = load_document ("multi-pages.pdf");
   cut_assert_equal_int (3, poppler_document_get_n_pages (document));
 
   output_path = g_build_filename (tmp_dir, "saved-multi-pages.pdf", NULL);
@@ -140,13 +167,10 @@ void
 test_save_a_copy (void)
 {
   GError *error = NULL;
-  const gchar *uri;
   gchar *copy_path;
   const gchar *copy_uri;
 
-  uri = build_uri ("multi-pages.pdf");
-  document = poppler_document_new_from_file (uri, NULL, &error);
-  gcut_assert_error (error);
+  document = load_document ("multi-pages.pdf");
   cut_assert_equal_int (3, poppler_document_get_n_pages (document));
 
   copy_path = g_build_filename (tmp_dir, "copied-multi-pages.pdf", NULL);
@@ -344,15 +368,7 @@ cut_poppler_assert_equal_property_helper (const gchar *title,
 void
 test_property (void)
 {
-  GError *error = NULL;
-  const gchar *uri;
-  gchar *copy_path;
-  const gchar *copy_uri;
-
-  uri = build_uri ("property.pdf");
-  document = poppler_document_new_from_file (uri, NULL, &error);
-  gcut_assert_error (error);
-
+  document = load_document ("property.pdf");
   cut_poppler_assert_equal_property ("Property Document", "PDF-1.4", NULL,
                                      "property", "property, test",
                                      1223783560, 0,
@@ -363,4 +379,34 @@ test_property (void)
                                      0,
                                      POPPLER_PERMISSIONS_FULL,
                                      document);
+}
+
+void
+test_font (void)
+{
+  PopplerFontsIter *iter;
+  gint n_pages;
+
+  document = load_document ("slide.pdf");
+  n_pages = poppler_document_get_n_pages (document);
+  font_info = poppler_font_info_new (document);
+  while (poppler_font_info_scan (font_info, n_pages, &iter))
+    {
+      if (iter)
+        {
+          do
+            {
+              actual_font_names =
+                g_list_append (actual_font_names,
+                               g_strdup (poppler_fonts_iter_get_name (iter)));
+            } while (poppler_fonts_iter_next (iter));
+          poppler_fonts_iter_free (iter);
+        }
+    }
+
+  expected_font_names = gcut_list_string_new ("IPAPMincho",
+                                              "LiberationSans-Regular",
+                                              NULL);
+  gcut_assert_equal_list_string (expected_font_names,
+                                 actual_font_names);
 }
