@@ -28,11 +28,11 @@ void test_save (void);
 void test_save_a_copy (void);
 void test_property (void);
 void test_font (void);
+void test_action (void);
 
 static PopplerDocument *document;
-static PopplerFontInfo *font_info;
-static GList *expected_font_names;
-static GList *actual_font_names;
+static GList *expected_font_names, *actual_font_names;
+static GList *expected_action_types, *actual_action_types;
 
 static gchar *tmp_base_dir;
 static gchar *tmp_dir;
@@ -41,10 +41,12 @@ void
 setup (void)
 {
   document = NULL;
-  font_info = NULL;
 
   expected_font_names = NULL;
   actual_font_names = NULL;
+
+  expected_action_types = NULL;
+  actual_action_types = NULL;
 
   cut_set_fixture_data_dir (poppler_test_get_base_dir (),
                             "fixtures",
@@ -63,13 +65,16 @@ teardown (void)
 {
   if (document)
     g_object_unref (document);
-  if (font_info)
-    g_object_unref (font_info);
 
   if (expected_font_names)
     gcut_list_string_free (expected_font_names);
   if (actual_font_names)
     gcut_list_string_free (actual_font_names);
+
+  if (expected_action_types)
+    g_list_free (expected_font_names);
+  if (actual_action_types)
+    g_list_free (actual_font_names);
 
   if (tmp_dir)
     g_free (tmp_dir);
@@ -384,6 +389,7 @@ test_property (void)
 void
 test_font (void)
 {
+  PopplerFontInfo *font_info;
   PopplerFontsIter *iter;
   gint n_pages;
 
@@ -403,10 +409,55 @@ test_font (void)
           poppler_fonts_iter_free (iter);
         }
     }
+  g_object_unref (font_info);
 
   expected_font_names = gcut_list_string_new ("IPAPMincho",
                                               "LiberationSans-Regular",
                                               NULL);
   gcut_assert_equal_list_string (expected_font_names,
                                  actual_font_names);
+}
+
+static void
+collect_action (PopplerIndexIter *iter)
+{
+  do
+    {
+      PopplerAction *action;
+      PopplerIndexIter *child;
+
+      action = poppler_index_iter_get_action (iter);
+      actual_action_types = g_list_append (actual_action_types,
+                                           GUINT_TO_POINTER (action->type));
+      poppler_action_free (action);
+      child = poppler_index_iter_get_child (iter);
+      if (child)
+	collect_action (child);
+      poppler_index_iter_free (child);
+    }
+  while (poppler_index_iter_next (iter));
+}
+
+void
+test_action (void)
+{
+  PopplerIndexIter *iter;
+
+  document = load_document ("slide.pdf");
+  iter = poppler_index_iter_new (document);
+  cut_assert_not_null (iter);
+
+  collect_action (iter);
+  poppler_index_iter_free (iter);
+
+#define APPEND(type)                                                    \
+  expected_action_types =                                               \
+    g_list_append (expected_action_types, GINT_TO_POINTER (type))
+
+  APPEND(POPPLER_ACTION_GOTO_DEST);
+  APPEND(POPPLER_ACTION_GOTO_DEST);
+#undef APPEND
+
+  gcut_assert_equal_list_enum (POPPLER_TYPE_ACTION_TYPE,
+                               expected_action_types, actual_action_types);
 }
