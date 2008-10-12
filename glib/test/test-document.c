@@ -229,22 +229,25 @@ inspect_property (const gchar *title,
   return g_string_free (inspected, FALSE);
 }
 
+#define cut_poppler_assert_equal_property(...)                          \
+  cut_trace(cut_poppler_assert_equal_property_helper(__VA_ARGS__))
+
 static void
-cut_poppler_assert_equal_property (const gchar *title,
-                                   const gchar *format,
-                                   const gchar *author,
-                                   const gchar *subject,
-                                   const gchar *keywords,
-                                   GTime creation_date,
-                                   GTime mod_date,
-                                   const gchar *creator,
-                                   const gchar *producer,
-                                   const gchar *linearized,
-                                   PopplerPageMode mode,
-                                   PopplerPageLayout layout,
-                                   PopplerViewerPreferences viewer_preferences,
-                                   PopplerPermissions permissions,
-                                   PopplerDocument *document)
+cut_poppler_assert_equal_property_helper (const gchar *title,
+                                          const gchar *format,
+                                          const gchar *author,
+                                          const gchar *subject,
+                                          const gchar *keywords,
+                                          GTime creation_date,
+                                          GTime mod_date,
+                                          const gchar *creator,
+                                          const gchar *producer,
+                                          const gchar *linearized,
+                                          PopplerPageMode mode,
+                                          PopplerPageLayout layout,
+                                          PopplerViewerPreferences viewer_preferences,
+                                          PopplerPermissions permissions,
+                                          PopplerDocument *document)
 {
   gchar *actual_title;
   gchar *actual_format;
