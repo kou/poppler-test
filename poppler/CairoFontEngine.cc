@@ -32,12 +32,16 @@
 #include "config.h"
 #include <string.h>
 #include "CairoFontEngine.h"
+#include "CairoOutputDev.h"
 #include "CharCodeToUnicode.h"
 #include "GlobalParams.h"
 #include <fofi/FoFiTrueType.h>
 #include <fofi/FoFiType1C.h>
 #include "goo/gfile.h"
 #include "Error.h"
+#include "XRef.h"
+#include "Gfx.h"
+#include "Page.h"
 
 #if HAVE_FCNTL_H && HAVE_SYS_MMAN_H && HAVE_SYS_STAT_H
 #include <fcntl.h>
@@ -50,15 +54,107 @@
 #pragma implementation
 #endif
 
-static void fileWrite(void *stream, char *data, int len) {
-  fwrite(data, 1, len, (FILE *)stream);
-}
 
 //------------------------------------------------------------------------
 // CairoFont
 //------------------------------------------------------------------------
 
+CairoFont::CairoFont(Ref ref,
+		     cairo_font_face_t *cairo_font_face,
+		     Gushort *codeToGID,
+		     int codeToGIDLen,
+		     GBool substitute,
+		     GBool printing) : ref(ref),
+				       cairo_font_face(cairo_font_face),
+				       codeToGID(codeToGID),
+				       codeToGIDLen(codeToGIDLen),
+				       substitute(substitute),
+				       printing(printing)      { }
+
+CairoFont::~CairoFont() {
+  cairo_font_face_destroy (cairo_font_face);
+  gfree(codeToGID);
+}
+
+GBool
+CairoFont::matches(Ref &other, GBool printingA) {
+  return (other.num == ref.num && other.gen == ref.gen && printing == printingA);
+}
+
+cairo_font_face_t *
+CairoFont::getFontFace(void) {
+  return cairo_font_face;
+}
+
+unsigned long
+CairoFont::getGlyph(CharCode code,
+		    Unicode *u, int uLen) {
+  FT_UInt gid;
+
+  if (codeToGID && code < codeToGIDLen) {
+    gid = (FT_UInt)codeToGID[code];
+  } else {
+    gid = (FT_UInt)code;
+  }
+  return gid;
+}
+
+double
+CairoFont::getSubstitutionCorrection(GfxFont *gfxFont)
+{
+  double w1, w2,w3;
+  CharCode code;
+  char *name;
+
+  // for substituted fonts: adjust the font matrix -- compare the
+  // width of 'm' in the original font and the substituted font
+  if (isSubstitute() && !gfxFont->isCIDFont()) {
+    for (code = 0; code < 256; ++code) {
+      if ((name = ((Gfx8BitFont *)gfxFont)->getCharName(code)) &&
+	  name[0] == 'm' && name[1] == '\0') {
+	break;
+      }
+    }
+    if (code < 256) {
+      w1 = ((Gfx8BitFont *)gfxFont)->getWidth(code);
+      {
+	cairo_matrix_t m;
+	cairo_matrix_init_identity(&m);
+	cairo_font_options_t *options = cairo_font_options_create();
+	cairo_font_options_set_hint_style(options, CAIRO_HINT_STYLE_NONE);
+	cairo_font_options_set_hint_metrics(options, CAIRO_HINT_METRICS_OFF);
+	cairo_scaled_font_t *scaled_font = cairo_scaled_font_create(cairo_font_face, &m, &m, options);
+
+	cairo_text_extents_t extents;
+	cairo_scaled_font_text_extents(scaled_font, "m", &extents);
+
+	cairo_scaled_font_destroy(scaled_font);
+	cairo_font_options_destroy(options);
+	w3 = extents.width;
+	w2 = extents.x_advance;
+      }
+      if (!gfxFont->isSymbolic()) {
+	// if real font is substantially narrower than substituted
+	// font, reduce the font size accordingly
+	if (w1 > 0.01 && w1 < 0.9 * w2) {
+	  w1 /= w2;
+	  return w1;
+	}
+      }
+    }
+  }
+  return 1.0;
+}
+
+//------------------------------------------------------------------------
+// CairoFreeTypeFont
+//------------------------------------------------------------------------
+
 static cairo_user_data_key_t _ft_cairo_key;
+
+static void fileWrite(void *stream, char *data, int len) {
+  fwrite(data, 1, len, (FILE *)stream);
+}
 
 static void
 _ft_done_face_uncached (void *closure)
@@ -223,7 +319,7 @@ _ft_new_face (FT_Library lib,
   {
     cairo_font_face_destroy (l->font_face);
     _ft_done_face (l);
-    return NULL;
+    return gFalse;
   }
 
   *face_out = l->face;
@@ -234,7 +330,23 @@ _ft_new_face (FT_Library lib,
 #define _ft_new_face _ft_new_face_uncached
 #endif
 
-CairoFont *CairoFont::create(GfxFont *gfxFont, XRef *xref, FT_Library lib, GBool useCIDs) {
+CairoFreeTypeFont::CairoFreeTypeFont(Ref ref,
+				     cairo_font_face_t *cairo_font_face,
+				     FT_Face face,
+				     Gushort *codeToGID,
+				     int codeToGIDLen,
+				     GBool substitute) : CairoFont(ref,
+								   cairo_font_face,
+								   codeToGID,
+								   codeToGIDLen,
+								   substitute,
+								   gTrue),
+							 face(face) { }
+
+CairoFreeTypeFont::~CairoFreeTypeFont() { }
+
+CairoFreeTypeFont *CairoFreeTypeFont::create(GfxFont *gfxFont, XRef *xref,
+					     FT_Library lib, GBool useCIDs) {
   Ref embRef;
   Object refObj, strObj;
   GooString *tmpFileName, *fileName,*tmpFileName2;
@@ -415,7 +527,7 @@ CairoFont *CairoFont::create(GfxFont *gfxFont, XRef *xref, FT_Library lib, GBool
     delete tmpFileName;
   }
 
-  return new CairoFont(ref,
+  return new CairoFreeTypeFont(ref,
 		       font_face, face,
 		       codeToGID, codeToGIDLen,
 		       substitute);
@@ -426,85 +538,171 @@ CairoFont *CairoFont::create(GfxFont *gfxFont, XRef *xref, FT_Library lib, GBool
   return NULL;
 }
 
-CairoFont::CairoFont(Ref ref, cairo_font_face_t *cairo_font_face, FT_Face face,
-    Gushort *codeToGID, int codeToGIDLen, GBool substitute) : ref(ref), cairo_font_face(cairo_font_face),
-					    face(face), codeToGID(codeToGID),
-					    codeToGIDLen(codeToGIDLen), substitute(substitute) { }
+//------------------------------------------------------------------------
+// CairoType3Font
+//------------------------------------------------------------------------
 
-CairoFont::~CairoFont() {
-  cairo_font_face_destroy (cairo_font_face);
-  gfree(codeToGID);
-}
+static const cairo_user_data_key_t type3_font_key = {0};
 
-GBool
-CairoFont::matches(Ref &other) {
-  return (other.num == ref.num && other.gen == ref.gen);
-}
+typedef struct _type3_font_info {
+  GfxFont *font;
+  XRef *xref;
+  Catalog *catalog;
+  CairoFontEngine *fontEngine;
+  GBool printing;
+} type3_font_info_t;
 
-cairo_font_face_t *
-CairoFont::getFontFace(void) {
-  return cairo_font_face;
-}
-
-unsigned long
-CairoFont::getGlyph(CharCode code,
-		    Unicode *u, int uLen) {
-  FT_UInt gid;
-
-  if (codeToGID && code < codeToGIDLen) {
-    gid = (FT_UInt)codeToGID[code];
-  } else {
-    gid = (FT_UInt)code;
-  }
-  return gid;
-}
-
-double
-CairoFont::getSubstitutionCorrection(GfxFont *gfxFont)
+static void
+_free_type3_font_info(void *closure)
 {
-  double w1, w2,w3;
-  CharCode code;
+  type3_font_info_t *info = (type3_font_info_t *) closure;
+
+  info->font->decRefCnt();
+  free (info);
+}
+
+static cairo_status_t
+_render_type3_glyph (cairo_scaled_font_t  *scaled_font,
+		     unsigned long         glyph,
+		     cairo_t              *cr,
+		     cairo_text_extents_t *metrics)
+{
+  Dict *charProcs;
+  Object charProc;
+  CairoOutputDev *output_dev;
+  cairo_matrix_t matrix, invert_y_axis;
+  double *mat;
+  double wx, wy;
+  PDFRectangle box;
+  type3_font_info_t *info;
+  GfxFont *font;
+  Dict *resDict;
+  Gfx *gfx;
+
+  info = (type3_font_info_t *)
+    cairo_font_face_get_user_data (cairo_scaled_font_get_font_face (scaled_font),
+				   &type3_font_key);
+
+  font = info->font;
+  resDict = ((Gfx8BitFont *)font)->getResources();
+  charProcs = ((Gfx8BitFont *)(info->font))->getCharProcs();
+  if (!charProcs)
+    return CAIRO_STATUS_USER_FONT_ERROR;
+
+  if ((int)glyph >= charProcs->getLength())
+    return CAIRO_STATUS_USER_FONT_ERROR;
+
+  mat = font->getFontMatrix();
+  matrix.xx = mat[0];
+  matrix.yx = mat[1];
+  matrix.xy = mat[2];
+  matrix.yy = mat[3];
+  matrix.x0 = mat[4];
+  matrix.y0 = mat[5];
+  cairo_matrix_init_scale (&invert_y_axis, 1, -1);
+  cairo_matrix_multiply (&matrix, &matrix, &invert_y_axis);
+  cairo_transform (cr, &matrix);
+
+  output_dev = new CairoOutputDev();
+  output_dev->setCairo(cr);
+  output_dev->setPrinting(info->printing);
+
+  mat = font->getFontBBox();
+  box.x1 = mat[0];
+  box.y1 = mat[1];
+  box.x2 = mat[2];
+  box.y2 = mat[3];
+  gfx = new Gfx(info->xref, output_dev, resDict, info->catalog, &box, NULL);
+  output_dev->startDoc(info->xref, info->catalog, info->fontEngine);
+  output_dev->startPage (1, gfx->getState());
+  output_dev->setInType3Char(gTrue);
+  gfx->display(charProcs->getVal(glyph, &charProc));
+
+  output_dev->getType3GlyphWidth (&wx, &wy);
+  cairo_matrix_transform_distance (&matrix, &wx, &wy);
+  metrics->x_advance = wx;
+  metrics->y_advance = wy;
+  if (output_dev->hasType3GlyphBBox()) {
+    double *bbox = output_dev->getType3GlyphBBox();
+
+    cairo_matrix_transform_point (&matrix, &bbox[0], &bbox[1]);
+    cairo_matrix_transform_point (&matrix, &bbox[2], &bbox[3]);
+    metrics->x_bearing = bbox[0];
+    metrics->y_bearing = bbox[1];
+    metrics->width = bbox[2] - bbox[0];
+    metrics->height = bbox[3] - bbox[1];
+  }
+
+  delete gfx;
+  delete output_dev;
+  charProc.free();
+
+  return CAIRO_STATUS_SUCCESS;
+}
+
+
+CairoType3Font *CairoType3Font::create(GfxFont *gfxFont, XRef *xref,
+				       Catalog *catalog, CairoFontEngine *fontEngine,
+				       GBool printing) {
+  Object refObj, strObj;
+  type3_font_info_t *info;
+  cairo_font_face_t *font_face;
+  Ref ref;
+  Gushort *codeToGID;
+  int codeToGIDLen;
+  int i, j;
+  char **enc;
+  Dict *charProcs;
   char *name;
 
-  // for substituted fonts: adjust the font matrix -- compare the
-  // width of 'm' in the original font and the substituted font
-  if (isSubstitute() && !gfxFont->isCIDFont()) {
-    for (code = 0; code < 256; ++code) {
-      if ((name = ((Gfx8BitFont *)gfxFont)->getCharName(code)) &&
-	  name[0] == 'm' && name[1] == '\0') {
-	break;
-      }
-    }
-    if (code < 256) {
-      w1 = ((Gfx8BitFont *)gfxFont)->getWidth(code);
-      {
-	cairo_matrix_t m;
-	cairo_matrix_init_identity(&m);
-	cairo_font_options_t *options = cairo_font_options_create();
-	cairo_font_options_set_hint_style(options, CAIRO_HINT_STYLE_NONE);
-	cairo_font_options_set_hint_metrics(options, CAIRO_HINT_METRICS_OFF);
-	cairo_scaled_font_t *scaled_font = cairo_scaled_font_create(cairo_font_face, &m, &m, options);
+  charProcs = ((Gfx8BitFont *)gfxFont)->getCharProcs();
+  info = (type3_font_info_t *) malloc(sizeof(*info));
+  ref = *gfxFont->getID();
+  font_face = cairo_user_font_face_create();
+  cairo_user_font_face_set_render_glyph_func (font_face, _render_type3_glyph);
+  gfxFont->incRefCnt();
+  info->font = gfxFont;
+  info->xref = xref;
+  info->catalog = catalog;
+  info->fontEngine = fontEngine;
+  info->printing = printing;
 
-	cairo_text_extents_t extents;
-	cairo_scaled_font_text_extents(scaled_font, "m", &extents);
+  cairo_font_face_set_user_data (font_face, &type3_font_key, (void *) info, _free_type3_font_info);
 
-	cairo_scaled_font_destroy(scaled_font);
-	cairo_font_options_destroy(options);
-	w3 = extents.width;
-	w2 = extents.x_advance;
-      }
-      if (!gfxFont->isSymbolic()) {
-	// if real font is substantially narrower than substituted
-	// font, reduce the font size accordingly
-	if (w1 > 0.01 && w1 < 0.9 * w2) {
-	  w1 /= w2;
-	  return w1;
+  enc = ((Gfx8BitFont *)gfxFont)->getEncoding();
+  codeToGID = (Gushort *)gmallocn(256, sizeof(int));
+  codeToGIDLen = 256;
+  for (i = 0; i < 256; ++i) {
+    codeToGID[i] = 0;
+    if ((name = enc[i])) {
+      for (j = 0; j < charProcs->getLength(); j++) {
+	if (strcmp(name, charProcs->getKey(j)) == 0) {
+	  codeToGID[i] = (Gushort) j;
 	}
       }
     }
   }
-  return 1.0;
+
+  return new CairoType3Font(ref, xref, catalog, font_face, codeToGID, codeToGIDLen, printing);
 }
+
+CairoType3Font::CairoType3Font(Ref ref,
+			       XRef *xref,
+			       Catalog *cat,
+			       cairo_font_face_t *cairo_font_face,
+			       Gushort *codeToGID,
+			       int codeToGIDLen,
+			       GBool printing) : CairoFont(ref,
+							   cairo_font_face,
+							   codeToGID,
+							   codeToGIDLen,
+							   gFalse,
+							   printing),
+						 xref(xref),
+						 catalog(catalog) { }
+
+CairoType3Font::~CairoType3Font() { }
+
 
 //------------------------------------------------------------------------
 // CairoFontEngine
@@ -535,23 +733,17 @@ CairoFontEngine::~CairoFontEngine() {
 }
 
 CairoFont *
-CairoFontEngine::getFont(GfxFont *gfxFont, XRef *xref) {
+CairoFontEngine::getFont(GfxFont *gfxFont, XRef *xref, Catalog *catalog, GBool printing) {
   int i, j;
   Ref ref;
   CairoFont *font;
   GfxFontType fontType;
   
-  fontType = gfxFont->getType();
-  if (fontType == fontType3) {
-    /* Need to figure this out later */
-    //    return NULL;
-  }
-
   ref = *gfxFont->getID();
 
   for (i = 0; i < cairoFontCacheSize; ++i) {
     font = fontCache[i];
-    if (font && font->matches(ref)) {
+    if (font && font->matches(ref, printing)) {
       for (j = i; j > 0; --j) {
 	fontCache[j] = fontCache[j-1];
       }
@@ -560,7 +752,12 @@ CairoFontEngine::getFont(GfxFont *gfxFont, XRef *xref) {
     }
   }
   
-  font = CairoFont::create (gfxFont, xref, lib, useCIDs);
+  fontType = gfxFont->getType();
+  if (fontType == fontType3)
+    font = CairoType3Font::create (gfxFont, xref, catalog, this, printing);
+  else
+    font = CairoFreeTypeFont::create (gfxFont, xref, lib, useCIDs);
+
   //XXX: if font is null should we still insert it into the cache?
   if (fontCache[cairoFontCacheSize - 1]) {
     delete fontCache[cairoFontCacheSize - 1];
@@ -571,4 +768,3 @@ CairoFontEngine::getFont(GfxFont *gfxFont, XRef *xref) {
   fontCache[0] = font;
   return font;
 }
-

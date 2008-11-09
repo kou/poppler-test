@@ -107,6 +107,7 @@ GBool CairoOutputDev::ft_lib_initialized = gFalse;
 
 CairoOutputDev::CairoOutputDev() {
   xref = NULL;
+  catalog = NULL;
 
   if (!ft_lib_initialized) {
     FT_Init_FreeType(&ft_lib);
@@ -114,6 +115,7 @@ CairoOutputDev::CairoOutputDev() {
   }
 
   fontEngine = NULL;
+  fontEngine_owner = gFalse;
   glyphs = NULL;
   fill_pattern = NULL;
   stroke_pattern = NULL;
@@ -124,6 +126,8 @@ CairoOutputDev::CairoOutputDev() {
   currentFont = NULL;
   prescaleImages = gTrue;
   printing = gTrue;
+  inType3Char = gFalse;
+  t3_glyph_has_bbox = gFalse;
 
   groupColorSpaceStack = NULL;
   group = NULL;
@@ -134,7 +138,7 @@ CairoOutputDev::CairoOutputDev() {
 }
 
 CairoOutputDev::~CairoOutputDev() {
-  if (fontEngine) {
+  if (fontEngine_owner && fontEngine) {
     delete fontEngine;
   }
 
@@ -171,12 +175,19 @@ void CairoOutputDev::setCairo(cairo_t *cairo)
   }
 }
 
-void CairoOutputDev::startDoc(XRef *xrefA) {
+void CairoOutputDev::startDoc(XRef *xrefA, Catalog *catalogA,
+			      CairoFontEngine *parentFontEngine) {
   xref = xrefA;
-  if (fontEngine) {
-    delete fontEngine;
+  catalog = catalogA;
+  if (parentFontEngine) {
+    fontEngine = parentFontEngine;
+  } else {
+    if (fontEngine) {
+      delete fontEngine;
+    }
+    fontEngine = new CairoFontEngine(ft_lib);
+    fontEngine_owner = gTrue;
   }
-  fontEngine = new CairoFontEngine(ft_lib);
 }
 
 void CairoOutputDev::startPage(int pageNum, GfxState *state) {
@@ -405,10 +416,7 @@ void CairoOutputDev::updateFont(GfxState *state) {
 
   needFontUpdate = gFalse;
 
-  if (state->getFont()->getType() == fontType3)	 
-    return;
-
-  currentFont = fontEngine->getFont (state->getFont(), xref);
+  currentFont = fontEngine->getFont (state->getFont(), xref, catalog, printing);
 
   if (!currentFont)
     return;
@@ -666,10 +674,19 @@ void CairoOutputDev::endType3Char(GfxState *state) {
 }
 
 void CairoOutputDev::type3D0(GfxState *state, double wx, double wy) {
+  t3_glyph_wx = wx;
+  t3_glyph_wy = wy;
 }
 
 void CairoOutputDev::type3D1(GfxState *state, double wx, double wy,
 			     double llx, double lly, double urx, double ury) {
+  t3_glyph_wx = wx;
+  t3_glyph_wy = wy;
+  t3_glyph_bbox[0] = llx;
+  t3_glyph_bbox[1] = lly;
+  t3_glyph_bbox[2] = urx;
+  t3_glyph_bbox[3] = ury;
+  t3_glyph_has_bbox = gTrue;
 }
 
 void CairoOutputDev::endTextObject(GfxState *state) {

@@ -19,7 +19,9 @@ INCLUDES =					\
 	$(GDK_CFLAGS)				\
 	$(FREETYPE_CFLAGS)			\
 	$(FONTCONFIG_CFLAGS)                    \
-	$(cairo_includes)			
+	$(cairo_includes)			\
+	$(POPPLER_GLIB_DISABLE_DEPRECATED)	\
+	$(POPPLER_GLIB_DISABLE_SINGLE_INCLUDES)
 
 stamp_files = stamp-poppler-enums.h
 
@@ -65,6 +67,7 @@ poppler_glib_public_headers =			\
 	poppler-attachment.h			\
 	poppler-form-field.h			\
 	poppler-annot.h				\
+	poppler-layer.h				\
 	poppler.h
 
 poppler_glib_includedir = $(includedir)/poppler/glib
@@ -83,6 +86,7 @@ libpoppler_glib_la_SOURCES =			\
 	poppler-attachment.cc			\
 	poppler-form-field.cc			\
 	poppler-annot.cc			\
+	poppler-layer.cc			\
 	poppler.cc				\
 	poppler-private.h
 

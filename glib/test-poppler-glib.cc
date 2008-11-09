@@ -31,24 +31,66 @@ poppler_format_date (GTime utime)
 }
 
 static void
-print_index (PopplerIndexIter *iter)
+print_index (PopplerIndexIter *iter, gint deph)
 {
   do
     {
-      PopplerAction *action;
+      PopplerAction    *action;
       PopplerIndexIter *child;
+      int               i;
 
       action = poppler_index_iter_get_action (iter);
-      g_print ("Action: %d\n", action->type);
+      for (i = 0; i < deph; i++)
+        g_print (" ");
+      g_print ("+ %s\n", action->any.title);
       poppler_action_free (action);
       child = poppler_index_iter_get_child (iter);
       if (child)
-	print_index (child);
+        print_index (child, deph + 1);
       poppler_index_iter_free (child);
     }
   while (poppler_index_iter_next (iter));
 }
 
+static void
+print_layers (PopplerLayersIter *iter, gint deph)
+{
+  do
+    {
+      PopplerLayersIter *child;
+      PopplerLayer      *layer;
+      gint               i;
+
+      for (i = 0; i < deph; i++)
+        g_print (" ");
+
+      layer = poppler_layers_iter_get_layer (iter);
+      if (layer)
+        {
+	  g_print ("+ %s (%s)\n", poppler_layer_get_title (layer),
+		   poppler_layer_is_visible (layer) ?
+		   "Visible" : "Hidden");
+	  g_object_unref (layer);
+	}
+      
+      child = poppler_layers_iter_get_child (iter);
+      if (child)
+        {
+	  gchar *title;
+
+	  title = poppler_layers_iter_get_title (iter);
+	  if (title)
+	    {
+	      g_print ("+ %s\n", title);
+	      g_free (title);
+	    }
+	  print_layers (child, deph + 1);
+	}
+      poppler_layers_iter_free (child);
+    }
+  while (poppler_layers_iter_next (iter));
+}
+ 
 static void
 print_document_info (PopplerDocument *document)
 {
@@ -127,7 +169,7 @@ print_document_info (PopplerDocument *document)
   if (index_iter)
     {
       g_print ("\tindex:\n");
-      print_index (index_iter);
+      print_index (index_iter, 0);
       poppler_index_iter_free (index_iter);
     }
 
@@ -341,6 +383,7 @@ int main (int argc, char *argv[])
   gint num_images;
   gint num_forms;
   gint form_id = 0;
+  PopplerLayersIter *layers_iter;
 
   if (argc != 3)
     FAIL ("usage: test-poppler-glib file://FILE PAGE");
@@ -536,6 +579,16 @@ int main (int argc, char *argv[])
     }
   else
     g_print ("\tNo attachments found\n");
+
+  layers_iter = poppler_layers_iter_new (document);
+  if (layers_iter)
+    {
+      g_print ("\tLayers:\n");
+      print_layers (layers_iter, 0);
+      poppler_layers_iter_free (layers_iter);
+    }
+  else
+    g_print ("\tNo layers found\n");
 
   g_object_unref (G_OBJECT (page));
   g_object_unref (G_OBJECT (document));

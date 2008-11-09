@@ -32,17 +32,24 @@ public:
   OCGs(Object *ocgObject, XRef *xref);
   ~OCGs();
 
+  // Is OCGS valid?
+  GBool isOk() { return ok; }
+  
   bool hasOCGs();
   GooList *getOCGs() const { return optionalContentGroups; }
 
   OptionalContentGroup* findOcgByRef( const Ref &ref);
 
-  Array* getOrderArray() const { return m_orderArray; }
-  Array* getRBGroupsArray() const { return m_rBGroupsArray; }
+  Array* getOrderArray() 
+    { return (order.isArray() && order.arrayGetLength() > 0) ? order.getArray() : NULL; }
+  Array* getRBGroupsArray() 
+    { return (rbgroups.isArray() && rbgroups.arrayGetLength()) ? rbgroups.getArray() : NULL; }
 
   bool optContentIsVisible( Object *dictRef );
 
 private:
+  GBool ok;
+  
   bool allOn( Array *ocgArray );
   bool allOff( Array *ocgArray );
   bool anyOn( Array *ocgArray );
@@ -50,8 +57,8 @@ private:
 
   GooList *optionalContentGroups;
 
-  Array *m_orderArray;
-  Array *m_rBGroupsArray;
+  Object order;
+  Object rbgroups;
   XRef *m_xref;
 };
 
@@ -61,18 +68,18 @@ class OptionalContentGroup {
 public:
   enum State { On, Off };
 
-  OptionalContentGroup(Dict *dict, XRef *xrefA);
+  OptionalContentGroup(Dict *dict);
 
   OptionalContentGroup(GooString *label);
 
   ~OptionalContentGroup();
 
-  GooString* name() const;
+  GooString* getName() const;
 
-  Ref ref() const;
+  Ref getRef() const;
   void setRef(const Ref ref);
 
-  State state() { return m_state; };
+  State getState() { return m_state; };
   void setState(State state) { m_state = state; };
 
 private:

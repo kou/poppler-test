@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007 Carlos Garcia Campos  <carlosgc@gnome.org>
+ * Copyright (C) 2008 Carlos Garcia Campos  <carlosgc@gnome.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,13 +19,13 @@
 #include <gtk/gtk.h>
 #include <poppler.h>
 
-#ifndef _TRANSITIONS_H_
-#define _TRANSITIONS_H_
+#ifndef _LAYERS_H_
+#define _LAYERS_H_
 
 G_BEGIN_DECLS
 
-GtkWidget *pgd_transitions_create_widget (PopplerDocument *document);
+GtkWidget *pgd_layers_create_widget (PopplerDocument *document);
 
 G_END_DECLS
 
-#endif /* _TRANSITIONS_H_ */
+#endif /* _LAYERS_H_ */ 
