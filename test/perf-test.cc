@@ -1,4 +1,5 @@
 /* Copyright Krzysztof Kowalczyk 2006-2007
+   Copyright Hib Eris <hib@hiberis.nl> 2008
    License: GPLv2 */
 /*
   A tool to stress-test poppler rendering and measure rendering times for
@@ -802,7 +803,7 @@ void LogInfo(char *fmt, ...)
     va_start(args, fmt);
     p += _vsnprintf(p, sizeof(buf) - 1, fmt, args);
     *p   = '\0';
-    fprintf(gOutFile, buf);
+    fprintf(gOutFile, "%s", buf);
     va_end(args);
     fflush(gOutFile);
 }
@@ -936,11 +937,12 @@ static void RenderPdf(const char *fileName)
         bmpSplash = engineSplash->renderBitmap(curPage, 100.0, 0);
         msTimer.stop();
         double timeInMs = msTimer.getElapsed();
-        if (gfTimings)
+        if (gfTimings) {
             if (!bmpSplash)
                 LogInfo("page splash %d: failed to render\n", curPage);
             else
                 LogInfo("page splash %d (%dx%d): %.2f ms\n", curPage, bmpSplash->getWidth(), bmpSplash->getHeight(), timeInMs);
+        }
 
         if (ShowPreview()) {
             PreviewBitmapSplash(bmpSplash);

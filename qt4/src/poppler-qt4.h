@@ -3,7 +3,7 @@
  * Copyright (C) 2005, 2007, Brad Hards <bradh@frogmouth.net>
  * Copyright (C) 2005-2008, Albert Astals Cid <aacid@kde.org>
  * Copyright (C) 2005, Stefan Kebekus <stefan.kebekus@math.uni-koeln.de>
- * Copyright (C) 2006-2008, Pino Toscano <pino@kde.org>
+ * Copyright (C) 2006-2009, Pino Toscano <pino@kde.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -218,6 +218,56 @@ namespace Poppler {
     };
 
 
+    class FontIteratorData;
+    /**
+       Iterator for reading the fonts in a document.
+
+       FontIterator provides a Java-style iterator for reading the fonts in a
+       document.
+
+       You can use it in the following way:
+       \code
+Poppler::FontIterator* it = doc->newFontIterator();
+while (it->hasNext()) {
+  QList<Poppler::FontInfo> fonts = it->next();
+  // do something with the fonts
+}
+       \endcode
+    */
+    class POPPLER_QT4_EXPORT FontIterator {
+    friend class Document;
+    friend class DocumentData;
+    public:
+	/**
+	   Destructor.
+	*/
+	~FontIterator();
+
+	/**
+	   Returns the fonts of the current page and then advances the iterator
+	   to the next page.
+	*/
+	QList<FontInfo> next();
+
+	/**
+	   Checks whether there is at least one more page to iterate, ie returns
+	   false when the iterator is beyond the last page.
+	*/
+	bool hasNext() const;
+
+	/**
+	   Returns the current page where the iterator is.
+	*/
+	int currentPage() const;
+
+    private:
+	Q_DISABLE_COPY( FontIterator )
+	FontIterator( int, DocumentData *dd );
+
+	FontIteratorData *d;
+    };
+
+
     class EmbeddedFileData;
     /**
        Container class for an embedded file with a PDF document
@@ -422,12 +472,12 @@ namespace Poppler {
 	QList<TextBox*> textList(Rotation rotate = Rotate0) const;
 
 	/**
-	   \return The dimensions of the page, in points (i.e. 1/72th on an inch)
+	   \return The dimensions (cropbox) of the page, in points (i.e. 1/72th on an inch)
 	*/
 	QSizeF pageSizeF() const;
 
 	/**
-	   \return The dimensions of the page, in points (i.e. 1/72th on an inch)
+	   \return The dimensions (cropbox) of the page, in points (i.e. 1/72th on an inch)
 	*/
 	QSize pageSize() const;
 
@@ -833,23 +883,52 @@ QString subject = m_doc->info("Subject");
 	/**
 	   The fonts within the PDF document.
 
+	   This is a shorthand for getting all the fonts at once.
+
 	   \note this can take a very long time to run with a large
-	   document. You may wish to use the call below if you have more
+	   document. You may wish to use a FontIterator if you have more
 	   than say 20 pages
+
+	   \see newFontIterator()
 	*/
 	QList<FontInfo> fonts() const;
 
 	/**
-	   \overload
-
+	   Scans for fonts within the PDF document.
 
 	   \param numPages the number of pages to scan
 	   \param fontList pointer to the list where the font information
 	   should be placed
 
+	   \note with this method you can scan for fonts only \em once for each
+	   document; once the end is reached, no more scanning with this method
+	   can be done
+
 	   \return false if the end of the document has been reached
+
+	   \deprecated this function is quite limited in its job (see note),
+	   better use fonts() or newFontIterator()
+
+	   \see fonts(), newFontIterator()
 	*/
-	bool scanForFonts( int numPages, QList<FontInfo> *fontList ) const; 
+	Q_DECL_DEPRECATED bool scanForFonts( int numPages, QList<FontInfo> *fontList ) const;
+
+	/**
+	   Creates a new FontIterator object for font scanning.
+
+	   The new iterator can be used for reading the font information of the
+	   document, reading page by page.
+
+	   The caller is responsible for the returned object, ie it should freed
+	   it when no more useful.
+
+	   \param startPage the initial page from which start reading fonts
+
+	   \see fonts()
+
+	   \since 0.12
+	*/
+	FontIterator* newFontIterator( int startPage = 0 ) const;
 
 	/**
 	   The font data if the font is an embedded one.

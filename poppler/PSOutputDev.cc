@@ -18,6 +18,8 @@
 // Copyright (C) 2006-2008 Albert Astals Cid <aacid@kde.org>
 // Copyright (C) 2006 Jeff Muizelaar <jeff@infidigm.net>
 // Copyright (C) 2007, 2008 Brad Hards <bradh@kde.org>
+// Copyright (C) 2008 Koji Otani <sho@bbr.jp>
+// Copyright (C) 2008 Hib Eris <hib@hiberis.nl>
 //
 // To see a description of the changes please see the Changelog file that
 // came with your tarball or type make ChangeLog if you are building from git
@@ -35,6 +37,7 @@
 #include <stdarg.h>
 #include <signal.h>
 #include <math.h>
+#include <limits.h>
 #include "goo/GooString.h"
 #include "goo/GooList.h"
 #include "poppler-config.h"
@@ -1646,7 +1649,7 @@ void PSOutputDev::setupFont(GfxFont *font, Dict *parentResDict) {
   } else if (globalParams->getPSEmbedType1() &&
 	     font->getType() == fontType1 &&
 	     font->getEmbeddedFontID(&fontFileID)) {
-    psName = filterPSName(font->getEmbeddedFontName());
+    psName = font->getEmbeddedFontName()->sanitizedName(gTrue /* ps mode */);
     setupEmbeddedType1Font(&fontFileID, psName);
 
   // check for embedded Type 1C font
@@ -1655,7 +1658,7 @@ void PSOutputDev::setupFont(GfxFont *font, Dict *parentResDict) {
 	     font->getEmbeddedFontID(&fontFileID)) {
     // use the PDF font name because the embedded font name might
     // not include the subset prefix
-    psName = filterPSName(font->getOrigName());
+    psName = font->getOrigName()->sanitizedName(gTrue /* ps mode */);
     setupEmbeddedType1CFont(font, &fontFileID, psName);
 
   // check for embedded OpenType - Type 1C font
@@ -1664,7 +1667,7 @@ void PSOutputDev::setupFont(GfxFont *font, Dict *parentResDict) {
 	     font->getEmbeddedFontID(&fontFileID)) {
     // use the PDF font name because the embedded font name might
     // not include the subset prefix
-    psName = filterPSName(font->getOrigName());
+    psName = font->getOrigName()->sanitizedName(gTrue /* ps mode */);
     setupEmbeddedOpenTypeT1CFont(font, &fontFileID, psName);
 
   // check for external Type 1 font file
@@ -1680,7 +1683,7 @@ void PSOutputDev::setupFont(GfxFont *font, Dict *parentResDict) {
 	     (font->getType() == fontTrueType ||
 	      font->getType() == fontTrueTypeOT) &&
 	     font->getEmbeddedFontID(&fontFileID)) {
-    psName = filterPSName(font->getEmbeddedFontName());
+    psName = font->getEmbeddedFontName()->sanitizedName(gTrue /* ps mode */);
     setupEmbeddedTrueTypeFont(font, &fontFileID, psName);
 
   // check for external TrueType font file
@@ -1693,7 +1696,7 @@ void PSOutputDev::setupFont(GfxFont *font, Dict *parentResDict) {
   } else if (globalParams->getPSEmbedCIDPostScript() &&
 	     font->getType() == fontCIDType0C &&
 	     font->getEmbeddedFontID(&fontFileID)) {
-    psName = filterPSName(font->getEmbeddedFontName());
+    psName = font->getEmbeddedFontName()->sanitizedName(gTrue /* ps mode */);
     setupEmbeddedCIDType0Font(font, &fontFileID, psName);
 
   // check for embedded CID TrueType font
@@ -1701,14 +1704,14 @@ void PSOutputDev::setupFont(GfxFont *font, Dict *parentResDict) {
 	     (font->getType() == fontCIDType2 ||
 	      font->getType() == fontCIDType2OT) &&
 	     font->getEmbeddedFontID(&fontFileID)) {
-    psName = filterPSName(font->getEmbeddedFontName());
+    psName = font->getEmbeddedFontName()->sanitizedName(gTrue /* ps mode */);
     setupEmbeddedCIDTrueTypeFont(font, &fontFileID, psName, gTrue);
 
   // check for embedded OpenType - CID CFF font
   } else if (globalParams->getPSEmbedCIDPostScript() &&
 	     font->getType() == fontCIDType0COT &&
 	     font->getEmbeddedFontID(&fontFileID)) {
-    psName = filterPSName(font->getEmbeddedFontName());
+    psName = font->getEmbeddedFontName()->sanitizedName(gTrue /* ps mode */);
     setupEmbeddedOpenTypeCFFFont(font, &fontFileID, psName);
 
   // check for Type 3 font
@@ -1877,6 +1880,7 @@ void PSOutputDev::setupEmbeddedType1Font(Ref *id, GooString *psName) {
   int c;
   int start[4];
   GBool binMode;
+  GBool writePadding = gTrue;
   int i;
 
   // check if font is already embedded
@@ -1948,6 +1952,17 @@ void PSOutputDev::setupEmbeddedType1Font(Ref *id, GooString *psName) {
       binMode = gTrue;
   }
 
+  if (length2 == 0)
+  {
+    // length2 == 0 is an error
+    // trying to solve it by just piping all
+    // the stream data
+    error(-1, "Font has length2 as 0, trying to overcome the problem reading the stream until the end");
+    length2 = INT_MAX;
+    writePadding = gFalse;
+  }
+
+
   // convert binary data to ASCII
   if (binMode) {
     for (i = 0; i < 4; ++i) {
@@ -1986,12 +2001,15 @@ void PSOutputDev::setupEmbeddedType1Font(Ref *id, GooString *psName) {
     }
   }
 
-  // write padding and "cleartomark"
-  for (i = 0; i < 8; ++i) {
-    writePS("00000000000000000000000000000000"
-	    "00000000000000000000000000000000\n");
+  if (writePadding)
+  {
+    // write padding and "cleartomark"
+    for (i = 0; i < 8; ++i) {
+      writePS("00000000000000000000000000000000"
+	      "00000000000000000000000000000000\n");
+    }
+    writePS("cleartomark\n");
   }
-  writePS("cleartomark\n");
 
   // ending comment
   writePS("%%EndResource\n");
@@ -2206,7 +2224,7 @@ GooString *PSOutputDev::setupExternalTrueTypeFont(GfxFont *font) {
     }
   }
 
-  psName = filterPSName(font->getName());
+  psName = font->getName()->sanitizedName(gTrue /* ps mode */);
   // add entry to fontFileNames list
   if (i == fontFileNameLen) {
     if (fontFileNameLen >= fontFileNameSize) {
@@ -2279,7 +2297,7 @@ GooString *PSOutputDev::setupExternalCIDTrueTypeFont(GfxFont *font, GooString *f
     }
   }
 
-  psName = filterPSName(font->getName());
+  psName = font->getName()->sanitizedName(gTrue /* ps mode */);
   // add entry to fontFileNames list
   if (i == fontFileNameLen) {
     if (fontFileNameLen >= fontFileNameSize) {
@@ -2610,6 +2628,7 @@ void PSOutputDev::setupImage(Ref id, Stream *str) {
   GooString *s;
   int c;
   int size, line, col, i;
+  int outerSize, outer;
 
   // check if image is already setup
   for (i = 0; i < imgIDLen; ++i) {
@@ -2696,56 +2715,72 @@ void PSOutputDev::setupImage(Ref id, Stream *str) {
   if (useRLE) {
     ++size;
   }
+  outerSize = size/65535 + 1;
+
   writePSFmt("{0:d} array dup /ImData_{1:d}_{2:d} exch def\n",
-	     size, id.num, id.gen);
+	     outerSize, id.num, id.gen);
   str->close();
 
   // write the data into the array
   str->reset();
-  line = col = 0;
-  writePS((char *)(useASCIIHex ? "dup 0 <" : "dup 0 <~"));
-  do {
-    do {
-      c = str->getChar();
-    } while (c == '\n' || c == '\r');
-    if (c == (useASCIIHex ? '>' : '~') || c == EOF) {
-      break;
-    }
-    if (c == 'z') {
-      writePSChar(c);
-      ++col;
-    } else {
-      writePSChar(c);
-      ++col;
-      for (i = 1; i <= (useASCIIHex ? 1 : 4); ++i) {
-	do {
-	  c = str->getChar();
-	} while (c == '\n' || c == '\r');
-	if (c == (useASCIIHex ? '>' : '~') || c == EOF) {
-	  break;
-	}
+  for (outer = 0;outer < outerSize;outer++) {
+    int innerSize = size > 65535 ? 65535 : size;
+
+    // put the inner array into the outer array
+    writePSFmt("{0:d} array 1 index {1:d} 2 index put\n",
+	       innerSize, outer);
+    line = col = 0;
+    writePS((char *)(useASCIIHex ? "dup 0 <" : "dup 0 <~"));
+    for (;;) {
+      do {
+	c = str->getChar();
+      } while (c == '\n' || c == '\r');
+      if (c == (useASCIIHex ? '>' : '~') || c == EOF) {
+	break;
+      }
+      if (c == 'z') {
 	writePSChar(c);
 	++col;
+      } else {
+	writePSChar(c);
+	++col;
+	for (i = 1; i <= (useASCIIHex ? 1 : 4); ++i) {
+	  do {
+	    c = str->getChar();
+	  } while (c == '\n' || c == '\r');
+	  if (c == (useASCIIHex ? '>' : '~') || c == EOF) {
+	    break;
+	  }
+	  writePSChar(c);
+	  ++col;
+	}
+      }
+      // each line is: "dup nnnnn <~...data...~> put<eol>"
+      // so max data length = 255 - 20 = 235
+      // chunks are 1 or 4 bytes each, so we have to stop at 232
+      // but make it 225 just to be safe
+      if (col > 225) {
+	writePS((char *)(useASCIIHex ? "> put\n" : "~> put\n"));
+	++line;
+	if (line >= innerSize) break;
+	writePSFmt((char *)(useASCIIHex ? "dup {0:d} <" : "dup {0:d} <~"), line);
+	col = 0;
       }
     }
-    // each line is: "dup nnnnn <~...data...~> put<eol>"
-    // so max data length = 255 - 20 = 235
-    // chunks are 1 or 4 bytes each, so we have to stop at 232
-    // but make it 225 just to be safe
-    if (col > 225) {
+    if (c == (useASCIIHex ? '>' : '~') || c == EOF) {
       writePS((char *)(useASCIIHex ? "> put\n" : "~> put\n"));
-      ++line;
-      writePSFmt((char *)(useASCIIHex ? "dup {0:d} <" : "dup {0:d} <~"), line);
-      col = 0;
+      if (useRLE) {
+	++line;
+	writePSFmt("{0:d} <> put\n", line);
+      } else {
+	writePS("pop\n");
+      }
+      break;
     }
-  } while (c != (useASCIIHex ? '>' : '~') && c != EOF);
-  writePS((char *)(useASCIIHex ? "> put\n" : "~> put\n"));
-  if (useRLE) {
-    ++line;
-    writePSFmt("{0:d} <> put\n", line);
-  } else {
     writePS("pop\n");
+    size -= innerSize;
   }
+  writePS("pop\n");
   str->close();
 
   delete str;
@@ -4382,7 +4417,7 @@ void PSOutputDev::doImageL1(Object *ref, GfxImageColorMap *colorMap,
       // make sure the image is setup, it sometimes is not like on bug #17645
       setupImage(ref->getRef(), str);
       // set up to use the array already created by setupImages()
-      writePSFmt("ImData_{0:d}_{1:d} 0\n", ref->getRefNum(), ref->getRefGen());
+      writePSFmt("ImData_{0:d}_{1:d} 0 0\n", ref->getRefNum(), ref->getRefGen());
     }
   }
 
@@ -4845,7 +4880,7 @@ void PSOutputDev::doImageL2(Object *ref, GfxImageColorMap *colorMap,
       // make sure the image is setup, it sometimes is not like on bug #17645
       setupImage(ref->getRef(), str);
       // set up to use the array already created by setupImages()
-      writePSFmt("ImData_{0:d}_{1:d} 0\n", ref->getRefNum(), ref->getRefGen());
+      writePSFmt("ImData_{0:d}_{1:d} 0 0\n",ref->getRefNum(), ref->getRefGen());
     }
   }
 
@@ -4899,7 +4934,12 @@ void PSOutputDev::doImageL2(Object *ref, GfxImageColorMap *colorMap,
 
   // data source
   if (mode == psModeForm || inType3Char || preload) {
-    writePS("  /DataSource { 2 copy get exch 1 add exch }\n");
+    if (inlineImg) {
+      writePS("  /DataSource { 2 copy get exch 1 add exch }\n");
+    } else {
+      writePS("  /DataSource { dup 65535 ge { pop 1 add 0 } if 2 index 2"
+	" index get 1 index get exch 1 add exch }\n");
+    }
   } else {
     writePS("  /DataSource currentfile\n");
   }
@@ -4938,6 +4978,7 @@ void PSOutputDev::doImageL2(Object *ref, GfxImageColorMap *colorMap,
     writePSFmt(">>\n{0:s}\n", colorMap ? "image" : "imagemask");
 
     // get rid of the array and index
+    if (!inlineImg) writePS("pop ");
     writePS("pop pop\n");
 
   } else {
@@ -5115,7 +5156,7 @@ void PSOutputDev::doImageL3(Object *ref, GfxImageColorMap *colorMap,
       // make sure the image is setup, it sometimes is not like on bug #17645
       setupImage(ref->getRef(), str);
       // set up to use the array already created by setupImages()
-      writePSFmt("ImData_{0:d}_{1:d} 0\n", ref->getRefNum(), ref->getRefGen());
+      writePSFmt("ImData_{0:d}_{1:d} 0 0\n", ref->getRefNum(), ref->getRefGen());
     }
   }
 
@@ -5186,7 +5227,12 @@ void PSOutputDev::doImageL3(Object *ref, GfxImageColorMap *colorMap,
 
   // data source
   if (mode == psModeForm || inType3Char || preload) {
-    writePS("  /DataSource { 2 copy get exch 1 add exch }\n");
+    if (inlineImg) {
+	writePS("  /DataSource { 2 copy get exch 1 add exch }\n");
+    } else {
+	writePS("  /DataSource { dup 65535 ge { pop 1 add 0 } if 2 index 2"
+	  " index get 1 index get exch 1 add exch }\n");
+    }
   } else {
     writePS("  /DataSource currentfile\n");
   }
@@ -5322,6 +5368,7 @@ void PSOutputDev::doImageL3(Object *ref, GfxImageColorMap *colorMap,
 
   // get rid of the array and index
   if (mode == psModeForm || inType3Char || preload) {
+    if (!inlineImg) writePS("pop ");
     writePS("pop pop\n");
 
   // image data
@@ -6141,7 +6188,7 @@ void PSOutputDev::cvtFunction(Function *func) {
 	  writePSFmt("{0:d} index {1:d} get dup\n",
 		     i + k/2 + (1 << (m-j)) - k, j);
 	  writePS("3 2 roll mul exch 1 exch sub 3 2 roll mul add\n");
-	  writePSFmt("{0:d} 1 roll\n", k/2 + (1 << m-j) - k - 1);
+	  writePSFmt("{0:d} 1 roll\n", k/2 + (1 << (m-j)) - k - 1);
 	}
 	// [e01] [efrac] s'(0) s'(1) ... s(2^(m-j-1)-1)
       }
@@ -6292,37 +6339,6 @@ void PSOutputDev::writePSName(char *s) {
       writePSChar(c);
     }
   }
-}
-
-GooString *PSOutputDev::filterPSName(GooString *name) {
-  GooString *name2;
-  char buf[8];
-  int i;
-  char c;
-
-  name2 = new GooString();
-
-  // ghostscript chokes on names that begin with out-of-limits
-  // numbers, e.g., 1e4foo is handled correctly (as a name), but
-  // 1e999foo generates a limitcheck error
-  c = name->getChar(0);
-  if (c >= '0' && c <= '9') {
-    name2->append('f');
-  }
-
-  for (i = 0; i < name->getLength(); ++i) {
-    c = name->getChar(i);
-    if (c <= (char)0x20 || c >= (char)0x7f ||
-	c == '(' || c == ')' || c == '<' || c == '>' ||
-	c == '[' || c == ']' || c == '{' || c == '}' ||
-	c == '/' || c == '%') {
-      sprintf(buf, "#%02x", c & 0xff);
-      name2->append(buf);
-    } else {
-      name2->append(c);
-    }
-  }
-  return name2;
 }
 
 // Convert GooString to GooString, with appropriate escaping

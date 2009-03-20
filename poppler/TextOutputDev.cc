@@ -12,12 +12,14 @@
 //
 // Copyright (C) 2005-2007 Kristian Høgsberg <krh@redhat.com>
 // Copyright (C) 2005 Nickolay V. Shmyrev <nshmyrev@yandex.ru>
-// Copyright (C) 2006, 2007 Carlos Garcia Campos <carlosgc@gnome.org>
+// Copyright (C) 2006-2008 Carlos Garcia Campos <carlosgc@gnome.org>
 // Copyright (C) 2006, 2007 Ed Catmur <ed@catmur.co.uk>
 // Copyright (C) 2006 Jeff Muizelaar <jeff@infidigm.net>
 // Copyright (C) 2007, 2008 Adrian Johnson <ajohnson@redneon.com>
 // Copyright (C) 2008 Koji Otani <sho@bbr.jp>
 // Copyright (C) 2008 Albert Astals Cid <aacid@kde.org>
+// Copyright (C) 2008 Pino Toscano <pino@kde.org>
+// Copyright (C) 2008 Hib Eris <hib@hiberis.nl>
 //
 // To see a description of the changes please see the Changelog file that
 // came with your tarball or type make ChangeLog if you are building from git
@@ -1772,6 +1774,7 @@ TextWord *TextWordList::get(int idx) {
 TextPage::TextPage(GBool rawOrderA) {
   int rot;
 
+  refCnt = 1;
   rawOrder = rawOrderA;
   curWord = NULL;
   charPos = 0;
@@ -1808,6 +1811,15 @@ TextPage::~TextPage() {
   delete fonts;
   deleteGooList(underlines, TextUnderline);
   deleteGooList(links, TextLink);
+}
+
+void TextPage::incRefCnt() {
+  refCnt++;
+}
+
+void TextPage::decRefCnt() {
+  if (--refCnt == 0)
+    delete this;
 }
 
 void TextPage::startPage(GfxState *state) {
@@ -3800,8 +3812,8 @@ void TextLine::visitSelection(TextSelectionVisitor *visitor,
 	(selection->x2 < p->xMax && selection->y2 < p->yMax))
       if (begin == NULL) 
 	begin = p;
-    if ((selection->x1 > p->xMin && selection->y1 > p->yMin ||
-	 selection->x2 > p->xMin && selection->y2 > p->yMin) && (begin != NULL)) {
+    if (((selection->x1 > p->xMin && selection->y1 > p->yMin) ||
+	 (selection->x2 > p->xMin && selection->y2 > p->yMin)) && (begin != NULL)) {
       end = p->next;
       current = p;
     }
@@ -3812,7 +3824,7 @@ void TextLine::visitSelection(TextSelectionVisitor *visitor,
   
   child_selection = *selection;
   if (style == selectionStyleWord) {
-    child_selection.x1 = begin->xMin;
+    child_selection.x1 = begin ? begin->xMin : xMin;
     if (end && end->xMax != -1) {
       child_selection.x2 = current->xMax;
     } else {
@@ -3885,8 +3897,9 @@ void TextBlock::visitSelection(TextSelectionVisitor *visitor,
       stop_y = selection->y1;
     }
 
-    if ((selection->x1 > p->xMin && selection->y1 > p->yMin ||
-	selection->x2 > p->xMin && selection->y2 > p->yMin) && (begin != NULL))
+    if (((selection->x1 > p->xMin && selection->y1 > p->yMin) ||
+	 (selection->x2 > p->xMin && selection->y2 > p->yMin))
+	&& (begin != NULL))
       end = p->next;
   }
 
@@ -3963,8 +3976,8 @@ void TextPage::visitSelection(TextSelectionVisitor *visitor,
       stop_y = selection->y1;
     }
 
-    if (selection->x1 > b->xMin && selection->y1 > b->yMin ||
-	selection->x2 > b->xMin && selection->y2 > b->yMin)
+    if ((selection->x1 > b->xMin && selection->y1 > b->yMin) ||
+	(selection->x2 > b->xMin && selection->y2 > b->yMin))
       end = i + 1;
   }
 
@@ -4484,98 +4497,24 @@ TextWordList *TextPage::makeWordList(GBool physLayout) {
 #endif
 
 //------------------------------------------------------------------------
-// TextOutputDev
+// ActualText
 //------------------------------------------------------------------------
-
-static void TextOutputDev_outputToFile(void *stream, char *text, int len) {
-  fwrite(text, 1, len, (FILE *)stream);
-}
-
-TextOutputDev::TextOutputDev(char *fileName, GBool physLayoutA,
-			     GBool rawOrderA, GBool append) {
-  text = NULL;
-  physLayout = physLayoutA;
-  rawOrder = rawOrderA;
-  doHTML = gFalse;
-  ok = gTrue;
-
-  // open file
-  needClose = gFalse;
-  if (fileName) {
-    if (!strcmp(fileName, "-")) {
-      outputStream = stdout;
-#ifdef WIN32
-      // keep DOS from munging the end-of-line characters
-      setmode(fileno(stdout), O_BINARY);
-#endif
-    } else if ((outputStream = fopen(fileName, append ? "ab" : "wb"))) {
-      needClose = gTrue;
-    } else {
-      error(-1, "Couldn't open text file '%s'", fileName);
-      ok = gFalse;
-      return;
-    }
-    outputFunc = &TextOutputDev_outputToFile;
-  } else {
-    outputStream = NULL;
-  }
-
-  // set up text object
-  text = new TextPage(rawOrderA);
+ActualText::ActualText(TextPage *out) {
+  out->incRefCnt();
+  text = out;
+  actualText = NULL;
   actualTextBMCLevel = 0;
 }
 
-TextOutputDev::TextOutputDev(TextOutputFunc func, void *stream,
-			     GBool physLayoutA, GBool rawOrderA) {
-  outputFunc = func;
-  outputStream = stream;
-  needClose = gFalse;
-  physLayout = physLayoutA;
-  rawOrder = rawOrderA;
-  doHTML = gFalse;
-  text = new TextPage(rawOrderA);
-  ok = gTrue;
-  actualTextBMCLevel = 0;
+ActualText::~ActualText() {
+  if (actualText)
+    delete actualText;
+  text->decRefCnt();
 }
 
-TextOutputDev::~TextOutputDev() {
-  if (needClose) {
-#ifdef MACOS
-    ICS_MapRefNumAndAssign((short)((FILE *)outputStream)->handle);
-#endif
-    fclose((FILE *)outputStream);
-  }
-  if (text) {
-    delete text;
-  }
-}
-
-void TextOutputDev::startPage(int pageNum, GfxState *state) {
-  text->startPage(state);
-}
-
-void TextOutputDev::endPage() {
-  text->endPage();
-  text->coalesce(physLayout, doHTML);
-  if (outputStream) {
-    text->dump(outputStream, outputFunc, physLayout);
-  }
-}
-
-void TextOutputDev::updateFont(GfxState *state) {
-  text->updateFont(state);
-}
-
-void TextOutputDev::beginString(GfxState *state, GooString *s) {
-}
-
-void TextOutputDev::endString(GfxState *state) {
-}
-
-void TextOutputDev::drawChar(GfxState *state, double x, double y,
-			     double dx, double dy,
-			     double originX, double originY,
-			     CharCode c, int nBytes, Unicode *u, int uLen) {
+void ActualText::addChar(GfxState *state, double x, double y,
+			 double dx, double dy,
+			 CharCode c, int nBytes, Unicode *u, int uLen) {
   if (actualTextBMCLevel == 0) {
     text->addChar(state, x, y, dx, dy, c, nBytes, u, uLen);
   } else {
@@ -4599,16 +4538,14 @@ void TextOutputDev::drawChar(GfxState *state, double x, double y,
   }
 }
 
-void TextOutputDev::beginMarkedContent(char *name, Dict *properties)
-{
-  Object obj;
-
+void ActualText::beginMC(Dict *properties) {
   if (actualTextBMCLevel > 0) {
     // Already inside a ActualText span.
     actualTextBMCLevel++;
     return;
   }
 
+  Object obj;
   if (properties->lookup("ActualText", &obj)) {
     if (obj.isString()) {
       actualText = obj.getString();
@@ -4618,8 +4555,7 @@ void TextOutputDev::beginMarkedContent(char *name, Dict *properties)
   }
 }
 
-void TextOutputDev::endMarkedContent(GfxState *state)
-{
+void ActualText::endMC(GfxState *state) {
   char *uniString = NULL;
   Unicode *uni;
   int length, i;
@@ -4668,8 +4604,116 @@ void TextOutputDev::endMarkedContent(GfxState *state)
       if (!actualText->hasUnicodeMarker())
 	delete [] uniString;
       delete actualText;
+      actualText = NULL;
     }
   }
+}
+
+//------------------------------------------------------------------------
+// TextOutputDev
+//------------------------------------------------------------------------
+
+static void TextOutputDev_outputToFile(void *stream, char *text, int len) {
+  fwrite(text, 1, len, (FILE *)stream);
+}
+
+TextOutputDev::TextOutputDev(char *fileName, GBool physLayoutA,
+			     GBool rawOrderA, GBool append) {
+  text = NULL;
+  physLayout = physLayoutA;
+  rawOrder = rawOrderA;
+  doHTML = gFalse;
+  ok = gTrue;
+
+  // open file
+  needClose = gFalse;
+  if (fileName) {
+    if (!strcmp(fileName, "-")) {
+      outputStream = stdout;
+#ifdef WIN32
+      // keep DOS from munging the end-of-line characters
+      setmode(fileno(stdout), O_BINARY);
+#endif
+    } else if ((outputStream = fopen(fileName, append ? "ab" : "wb"))) {
+      needClose = gTrue;
+    } else {
+      error(-1, "Couldn't open text file '%s'", fileName);
+      ok = gFalse;
+      return;
+    }
+    outputFunc = &TextOutputDev_outputToFile;
+  } else {
+    outputStream = NULL;
+  }
+
+  // set up text object
+  text = new TextPage(rawOrderA);
+  actualText = new ActualText(text);
+}
+
+TextOutputDev::TextOutputDev(TextOutputFunc func, void *stream,
+			     GBool physLayoutA, GBool rawOrderA) {
+  outputFunc = func;
+  outputStream = stream;
+  needClose = gFalse;
+  physLayout = physLayoutA;
+  rawOrder = rawOrderA;
+  doHTML = gFalse;
+  text = new TextPage(rawOrderA);
+  actualText = new ActualText(text);
+  ok = gTrue;
+}
+
+TextOutputDev::~TextOutputDev() {
+  if (needClose) {
+#ifdef MACOS
+    ICS_MapRefNumAndAssign((short)((FILE *)outputStream)->handle);
+#endif
+    fclose((FILE *)outputStream);
+  }
+  if (text) {
+    text->decRefCnt();
+  }
+  delete actualText;
+}
+
+void TextOutputDev::startPage(int pageNum, GfxState *state) {
+  text->startPage(state);
+}
+
+void TextOutputDev::endPage() {
+  text->endPage();
+  text->coalesce(physLayout, doHTML);
+  if (outputStream) {
+    text->dump(outputStream, outputFunc, physLayout);
+  }
+}
+
+void TextOutputDev::updateFont(GfxState *state) {
+  text->updateFont(state);
+}
+
+void TextOutputDev::beginString(GfxState *state, GooString *s) {
+}
+
+void TextOutputDev::endString(GfxState *state) {
+}
+
+void TextOutputDev::drawChar(GfxState *state, double x, double y,
+			     double dx, double dy,
+			     double originX, double originY,
+			     CharCode c, int nBytes, Unicode *u, int uLen) {
+  actualText->addChar(state, x, y, dx, dy, c, nBytes, u, uLen);
+}
+
+void TextOutputDev::beginMarkedContent(char *name, Dict *properties)
+{
+  actualText->beginMC(properties);
+}
+
+void TextOutputDev::endMarkedContent(GfxState *state)
+{
+  actualText->endMC(state);
 }
 
 void TextOutputDev::stroke(GfxState *state) {

@@ -1,6 +1,6 @@
 project(poppler)
 
-cmake_minimum_required(VERSION 2.4.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 2.6.0 FATAL_ERROR)
 
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/modules)
 
@@ -22,6 +22,7 @@ option(ENABLE_SPLASH "Build the Splash graphics backend." ON)
 option(ENABLE_UTILS "Compile poppler command line utils." ON)
 option(ENABLE_ABIWORD "Build the Abiword backend." ON)
 option(ENABLE_LIBOPENJPEG "Use libopenjpeg for JPX streams." ON)
+option(ENABLE_LCMS "Use liblcms for color management." ON)
 option(ENABLE_ZLIB "TODO" OFF)
 option(USE_EXCEPTIONS "Throw exceptions to deal with not enough memory and similar problems." OFF)
 option(USE_FIXEDPOINT "Use fixed point arithmetic" OFF)
@@ -40,6 +41,7 @@ macro_bool_to_01(ENABLE_SPLASH HAVE_SPLASH)
 find_package(Freetype REQUIRED)
 find_package(Fontconfig REQUIRED)
 macro_optional_find_package(JPEG)
+macro_optional_find_package(PNG)
 if(JPEG_FOUND)
   set(ENABLE_LIBJPEG ${JPEG_FOUND})
 endif(JPEG_FOUND)
@@ -69,6 +71,10 @@ if(ENABLE_LIBOPENJPEG)
   find_package(LIBOPENJPEG)
   set(ENABLE_LIBOPENJPEG ${LIBOPENJPEG_FOUND})
 endif(ENABLE_LIBOPENJPEG)
+if(ENABLE_LCMS)
+  find_package(LCMS)
+  set(USE_CMS ${LCMS_FOUND})
+endif(ENABLE_LCMS)
 
 add_definitions(-DHAVE_CONFIG_H=1 ${FONTCONFIG_DEFINITIONS})
 include_directories(
@@ -78,7 +84,7 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/poppler
   ${CMAKE_CURRENT_BINARY_DIR}
   ${CMAKE_CURRENT_BINARY_DIR}/poppler
-  ${FREETYPE_INCLUDE_DIR}
+  ${FREETYPE_INCLUDE_DIRS}
 )
 set(HAVE_FREETYPE_H ON)
 
@@ -89,6 +95,10 @@ if(JPEG_FOUND)
   include_directories(${JPEG_INCLUDE_DIR})
   set(ENABLE_LIBJPEG ON)
 endif(JPEG_FOUND)
+if(PNG_FOUND)
+  include_directories(${PNG_INCLUDE_DIR})
+  set(ENABLE_LIBPNG ON)
+endif(PNG_FOUND)
 if(ENABLE_ABIWORD)
   include_directories(${LIBXML2_INCLUDE_DIR})
   add_definitions(${LIBXML2_DEFINITIONS})
@@ -228,6 +238,9 @@ else (LIBOPENJPEG_FOUND)
     poppler/JPXStream.cc
   )
 endif(LIBOPENJPEG_FOUND)
+if(USE_CMS)
+  set(poppler_LIBS ${poppler_LIBS} ${LCMS_LIBRARIES})
+endif(USE_CMS)
 if(ENABLE_ABIWORD)
   set(poppler_SRCS ${poppler_SRCS}
     poppler/ABWOutputDev.cc
@@ -251,19 +264,8 @@ install(TARGETS poppler RUNTIME DESTINATION bin LIBRARY DESTINATION lib ARCHIVE 
 
 if(ENABLE_XPDF_HEADERS)
   install(FILES
-    goo/GooHash.h
-    goo/GooList.h
-    goo/GooTimer.h
-    goo/GooMutex.h
-    goo/GooString.h
-    goo/GooVector.h
-    goo/gtypes.h
-    goo/gmem.h
-    goo/gfile.h
-    goo/FixedPoint.h
     poppler/Annot.h
     poppler/Array.h
-    poppler/BaseFile.h
     poppler/BuiltinFont.h
     poppler/BuiltinFontTables.h
     poppler/Catalog.h
@@ -287,8 +289,10 @@ if(ENABLE_XPDF_HEADERS)
     poppler/JBIG2Stream.h
     poppler/Lexer.h
     poppler/Link.h
+    poppler/Movie.h
     poppler/NameToCharCode.h
     poppler/Object.h
+    poppler/OptionalContent.h
     poppler/Outline.h
     poppler/OutputDev.h
     poppler/Page.h
@@ -318,9 +322,27 @@ if(ENABLE_XPDF_HEADERS)
     poppler/UTF8.h
     poppler/XpdfPluginAPI.h
     poppler/Sound.h
-    poppler/Movie.h
     ${CMAKE_CURRENT_BINARY_DIR}/poppler/poppler-config.h
     DESTINATION include/poppler)
+  install(FILES
+    goo/GooHash.h
+    goo/GooList.h
+    goo/GooTimer.h
+    goo/GooMutex.h
+    goo/GooString.h
+    goo/GooVector.h
+    goo/gtypes.h
+    goo/gmem.h
+    goo/gfile.h
+    goo/FixedPoint.h
+    DESTINATION include/poppler/goo)
+  install(FILES
+    fofi/FoFiBase.h
+    fofi/FoFiEncodings.h
+    fofi/FoFiTrueType.h
+    fofi/FoFiType1.h
+    fofi/FoFiType1C.h
+    DESTINATION include/poppler/fofi)
   if(LIBOPENJPEG_FOUND)
     install(FILES
       poppler/JPEG2000Stream.h
@@ -417,6 +439,8 @@ show_end_message("qt4 wrapper" QT4_FOUND)
 show_end_message("glib wrapper" GLIB_FOUND)
 # message("  use gtk-doc:        $enable_gtk_doc") # TODO
 show_end_message("use libjpeg" ENABLE_LIBJPEG)
+show_end_message("use libpng" ENABLE_LIBPNG)
 show_end_message("use zlib" ENABLE_ZLIB)
 show_end_message("use libopenjpeg" LIBOPENJPEG_FOUND)
+show_end_message("use cms" USE_CMS)
 show_end_message("command line utils" ENABLE_UTILS)

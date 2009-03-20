@@ -1,6 +1,7 @@
 /* poppler-private.cc: qt interface to poppler
  * Copyright (C) 2005, Net Integration Technologies, Inc.
  * Copyright (C) 2006 by Albert Astals Cid <aacid@kde.org>
+ * Copyright (C) 2008 by Pino Toscano <pino@kde.org>
  * Inspired on code by
  * Copyright (C) 2004 by Albert Astals Cid <tsdgeos@terra.es>
  * Copyright (C) 2004 by Enrico Ros <eros.kde@email.it>
@@ -24,6 +25,10 @@
 
 #include <QtCore/QByteArray>
 #include <QtCore/QDebug>
+#include <QtCore/QVariant>
+
+#include <Link.h>
+#include <Outline.h>
 
 namespace Poppler {
 
@@ -113,4 +118,103 @@ namespace Poppler {
         gfree(cstring);
         return ret;
     }
+
+    void linkActionToTocItem( ::LinkAction * a, DocumentData * doc, QDomElement * e )
+    {
+        if ( !a || !e )
+            return;
+
+        switch ( a->getKind() )
+        {
+            case actionGoTo:
+            {
+                // page number is contained/referenced in a LinkGoTo
+                LinkGoTo * g = static_cast< LinkGoTo * >( a );
+                LinkDest * destination = g->getDest();
+                if ( !destination && g->getNamedDest() )
+                {
+                    // no 'destination' but an internal 'named reference'. we could
+                    // get the destination for the page now, but it's VERY time consuming,
+                    // so better storing the reference and provide the viewport on demand
+                    GooString *s = g->getNamedDest();
+                    QChar *charArray = new QChar[s->getLength()];
+                    for (int i = 0; i < s->getLength(); ++i) charArray[i] = QChar(s->getCString()[i]);
+                    QString aux(charArray, s->getLength());
+                    e->setAttribute( "DestinationName", aux );
+                    delete[] charArray;
+                }
+                else if ( destination && destination->isOk() )
+                {
+                    LinkDestinationData ldd(destination, NULL, doc);
+                    e->setAttribute( "Destination", LinkDestination(ldd).toString() );
+                }
+                break;
+            }
+            case actionGoToR:
+            {
+                // page number is contained/referenced in a LinkGoToR
+                LinkGoToR * g = static_cast< LinkGoToR * >( a );
+                LinkDest * destination = g->getDest();
+                if ( !destination && g->getNamedDest() )
+                {
+                    // no 'destination' but an internal 'named reference'. we could
+                    // get the destination for the page now, but it's VERY time consuming,
+                    // so better storing the reference and provide the viewport on demand
+                    GooString *s = g->getNamedDest();
+                    QChar *charArray = new QChar[s->getLength()];
+                    for (int i = 0; i < s->getLength(); ++i) charArray[i] = QChar(s->getCString()[i]);
+                    QString aux(charArray, s->getLength());
+                    e->setAttribute( "DestinationName", aux );
+                    delete[] charArray;
+                }
+                else if ( destination && destination->isOk() )
+                {
+                    LinkDestinationData ldd(destination, NULL, doc);
+                    e->setAttribute( "Destination", LinkDestination(ldd).toString() );
+                }
+                e->setAttribute( "ExternalFileName", g->getFileName()->getCString() );
+                break;
+            }
+            case actionURI:
+            {
+                LinkURI * u = static_cast< LinkURI * >( a );
+                e->setAttribute( "DestinationURI", u->getURI()->getCString() );
+            }
+            default: ;
+        }
+    }
+
+    void DocumentData::addTocChildren( QDomDocument * docSyn, QDomNode * parent, GooList * items )
+    {
+        int numItems = items->getLength();
+        for ( int i = 0; i < numItems; ++i )
+        {
+            // iterate over every object in 'items'
+            OutlineItem * outlineItem = (OutlineItem *)items->get( i );
+
+            // 1. create element using outlineItem's title as tagName
+            QString name;
+            Unicode * uniChar = outlineItem->getTitle();
+            int titleLength = outlineItem->getTitleLength();
+            name = unicodeToQString(uniChar, titleLength);
+            if ( name.isEmpty() )
+                continue;
+
+            QDomElement item = docSyn->createElement( name );
+            parent->appendChild( item );
+
+            // 2. find the page the link refers to
+            ::LinkAction * a = outlineItem->getAction();
+            linkActionToTocItem( a, this, &item );
+
+            item.setAttribute( "Open", QVariant( (bool)outlineItem->isOpen() ).toString() );
+
+            // 3. recursively descend over children
+            outlineItem->open();
+            GooList * children = outlineItem->getKids();
+            if ( children )
+                addTocChildren( docSyn, &item, children );
+        }
+    }
+
 }

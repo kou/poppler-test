@@ -4,6 +4,7 @@
  * Copyright (C) 2005-2008, Albert Astals Cid <aacid@kde.org>
  * Copyright (C) 2005, Stefan Kebekus <stefan.kebekus@math.uni-koeln.de>
  * Copyright (C) 2006-2008, Pino Toscano <pino@kde.org>
+ * Copyright (C) 2008 Carlos Garcia Campos <carlosgc@gnome.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,6 +23,7 @@
 
 #include <poppler-qt4.h>
 
+#include <QtCore/QHash>
 #include <QtCore/QMap>
 #include <QtCore/QVarLengthArray>
 #include <QtGui/QImage>
@@ -34,6 +36,7 @@
 #include <ErrorCodes.h>
 #include <TextOutputDev.h>
 #include <Annot.h>
+#include <Link.h>
 #if defined(HAVE_SPLASH)
 #include <SplashOutputDev.h>
 #include <splash/SplashBitmap.h>
@@ -86,9 +89,9 @@ Link* PageData::convertLinkActionToLink(::LinkAction * a, DocumentData *parentDo
     {
       LinkGoToR * g = (LinkGoToR *) a;
       // copy link file
-      const char * fileName = g->getFileName()->getCString();
+      const QString fileName = UnicodeParsedString( g->getFileName() );
       // ceate link: fileName, namedDest, object pointer
-      popplerLink = new LinkGoto( linkArea, (QString)fileName, LinkDestination( LinkDestinationData(g->getDest(), g->getNamedDest(), parentDoc ) ) );
+      popplerLink = new LinkGoto( linkArea, fileName, LinkDestination( LinkDestinationData(g->getDest(), g->getNamedDest(), parentDoc ) ) );
     }
     break;
 
@@ -334,7 +337,7 @@ bool Page::search(const QString &text, QRectF &rect, SearchDirection direction, 
     found = textPage->findText( u.data(), len, 
             gTrue, gFalse, gFalse, gTrue, sCase, gFalse, &sLeft, &sTop, &sRight, &sBottom );
 
-  delete textPage;
+  textPage->decRefCnt();
 
   rect.setLeft( sLeft );
   rect.setTop( sTop );
@@ -364,7 +367,7 @@ QList<TextBox*> Page::textList(Rotation rotate) const
     return output_list;
   }
   
-  QMap<TextWord *, TextBox*> wordBoxMap;
+  QHash<TextWord *, TextBox*> wordBoxMap;
   
   for (int i = 0; i < word_list->getLength(); i++) {
     TextWord *word = word_list->get(i);
@@ -501,14 +504,14 @@ QList<Annotation*> Page::annotations() const
 
     // ID to Annotation/PopupWindow maps
     QMap< int, Annotation * > annotationsMap;
-    QMap< AnnotPopup *, PopupWindow * > popupsMap;
+    QHash< AnnotPopup *, PopupWindow * > popupsMap;
     // lists of Windows and Revisions that needs resolution
     QLinkedList< ResolveRevision > resolveRevList;
     QLinkedList< ResolveWindow > resolvePopList;
     QLinkedList< PostProcessText > ppTextList;
 
     // build a normalized transform matrix for this page at 100% scale
-    GfxState * gfxState = new GfxState( 72.0, 72.0, pdfPage->getMediaBox(), pdfPage->getRotate(), gTrue );
+    GfxState * gfxState = new GfxState( 72.0, 72.0, pdfPage->getCropBox(), pdfPage->getRotate(), gTrue );
     double * gfxCTM = gfxState->getCTM();
     double MTX[6];
     for ( int i = 0; i < 6; i+=2 )
@@ -1170,7 +1173,7 @@ QList<Annotation*> Page::annotations() const
         }
 
         // clear data
-        QMap< AnnotPopup *, PopupWindow * >::Iterator dIt = popupsMap.begin(), dEnd = popupsMap.end();
+        QHash< AnnotPopup *, PopupWindow * >::Iterator dIt = popupsMap.begin(), dEnd = popupsMap.end();
         for ( ; dIt != dEnd; ++dIt )
         {
             PopupWindow * p = dIt.value();

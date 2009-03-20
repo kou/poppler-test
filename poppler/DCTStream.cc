@@ -5,7 +5,8 @@
 // This file is licensed under the GPLv2 or later
 //
 // Copyright 2005 Jeff Muizelaar <jeff@infidigm.net>
-// Copyright 2005-2008 Albert Astals Cid <aacid@kde.org>
+// Copyright 2005-2009 Albert Astals Cid <aacid@kde.org>
+// Copyright 2009 Ryszard Trojnacki <rysiek@menel.com>
 //
 //========================================================================
 
@@ -74,7 +75,8 @@ static void exitErrorHandler(jpeg_common_struct *error) {
 
 void DCTStream::init()
 {
-  jpeg_create_decompress(&cinfo);
+  jpeg_std_error(&jerr);
+  jerr.error_exit = &exitErrorHandler;
   src.pub.init_source = str_init_source;
   src.pub.fill_input_buffer = str_fill_input_buffer;
   src.pub.skip_input_data = str_skip_input_data;
@@ -85,11 +87,12 @@ void DCTStream::init()
   src.str = str;
   src.index = 0;
   src.abort = false;
-  cinfo.src = (jpeg_source_mgr *)&src;
-  jpeg_std_error(&jerr);
-  jerr.error_exit = &exitErrorHandler;
+  current = NULL;
+  limit = NULL;
+  
   cinfo.err = &jerr;
-  x = 0;
+  jpeg_create_decompress(&cinfo);
+  cinfo.src = (jpeg_source_mgr *)&src;
   row_buffer = NULL;
 }
 
@@ -150,26 +153,24 @@ int DCTStream::getChar() {
   
   int c;
 
-  if (x == 0) {
+  if (current == limit) {
     if (cinfo.output_scanline < cinfo.output_height)
     {
       if (!jpeg_read_scanlines(&cinfo, row_buffer, 1)) return EOF;
+      current = &row_buffer[0][0];
+      limit = &row_buffer[0][(cinfo.output_width - 1) * cinfo.output_components] + cinfo.output_components;
     }
     else return EOF;
   }
-  c = row_buffer[0][x];
-  x++;
-  if (x == cinfo.output_width * cinfo.output_components)
-    x = 0;
+  c = *current;
+  ++current;
   return c;
 }
 
 int DCTStream::lookChar() {
   if (src.abort) return EOF;
   
-  int c;
-  c = row_buffer[0][x];
-  return c;
+  return *current;
 }
 
 GooString *DCTStream::getPSFilter(int psLevel, char *indent) {

@@ -219,6 +219,33 @@ poppler_document_new_from_data (char        *data,
   return _poppler_document_new_from_pdfdoc (newDoc, error);
 }
 
+static gboolean
+handle_save_error (int      err_code,
+		   GError **error)
+{
+  switch (err_code)
+    {
+    case errNone:
+      break;
+    case errOpenFile:
+      g_set_error (error, POPPLER_ERROR,
+		   POPPLER_ERROR_OPEN_FILE,
+		   "Failed to open file for writing");
+      break;
+    case errEncrypted:
+      g_set_error (error, POPPLER_ERROR,
+		   POPPLER_ERROR_ENCRYPTED,
+		   "Document is encrypted");
+      break;
+    default:
+      g_set_error (error, POPPLER_ERROR,
+		   POPPLER_ERROR_INVALID,
+		   "Failed to save document");
+    }
+
+  return err_code == errNone;
+}
+
 /**
  * poppler_document_save:
  * @document: a #PopplerDocument
@@ -245,10 +272,11 @@ poppler_document_save (PopplerDocument  *document,
   filename = g_filename_from_uri (uri, NULL, error);
   if (filename != NULL) {
     GooString *fname = new GooString (filename);
+    int err_code;
     g_free (filename);
 
-    retval = document->doc->saveAs (fname);
-
+    err_code = document->doc->saveAs (fname);
+    retval = handle_save_error (err_code, error);
     delete fname;
   }
 
@@ -282,10 +310,11 @@ poppler_document_save_a_copy (PopplerDocument  *document,
   filename = g_filename_from_uri (uri, NULL, error);
   if (filename != NULL) {
     GooString *fname = new GooString (filename);
+    int err_code;
     g_free (filename);
 
-    retval = document->doc->saveWithoutChangesAs (fname);
-
+    err_code = document->doc->saveWithoutChangesAs (fname);
+    retval = handle_save_error (err_code, error);
     delete fname;
   }
 
@@ -874,18 +903,9 @@ struct _PopplerIndexIter
 };
 
 
-GType
-poppler_index_iter_get_type (void)
-{
-  static GType our_type = 0;
-
-  if (our_type == 0)
-    our_type = g_boxed_type_register_static ("PopplerIndexIter",
-					     (GBoxedCopyFunc) poppler_index_iter_copy,
-					     (GBoxedFreeFunc) poppler_index_iter_free);
-
-  return our_type;
-}
+POPPLER_DEFINE_BOXED_TYPE (PopplerIndexIter, poppler_index_iter,
+			   poppler_index_iter_copy,
+			   poppler_index_iter_free)
 
 /**
  * poppler_index_iter_copy:
@@ -1122,18 +1142,9 @@ struct _PopplerFontsIter
 	int index;
 };
 
-GType
-poppler_fonts_iter_get_type (void)
-{
-  static GType our_type = 0;
-
-  if (our_type == 0)
-    our_type = g_boxed_type_register_static ("PopplerFontsIter",
-					     (GBoxedCopyFunc) poppler_fonts_iter_copy,
-					     (GBoxedFreeFunc) poppler_fonts_iter_free);
-
-  return our_type;
-}
+POPPLER_DEFINE_BOXED_TYPE (PopplerFontsIter, poppler_fonts_iter,
+			   poppler_fonts_iter_copy,
+			   poppler_fonts_iter_free)
 
 const char *
 poppler_fonts_iter_get_full_name (PopplerFontsIter *iter)
@@ -1557,17 +1568,9 @@ struct _PopplerLayersIter {
   int index;
 };
 
-GType
-poppler_layers_iter_get_type (void)
-{
-  static GType our_type = 0;
-
-  if (our_type == 0)
-    our_type = g_boxed_type_register_static ("PopplerLayersIter",
-					     (GBoxedCopyFunc) poppler_layers_iter_copy,
-					     (GBoxedFreeFunc) poppler_layers_iter_free);
-  return our_type;
-}
+POPPLER_DEFINE_BOXED_TYPE (PopplerLayersIter, poppler_layers_iter,
+			   poppler_layers_iter_copy,
+			   poppler_layers_iter_free)
 
 /**
  * poppler_layers_iter_copy:

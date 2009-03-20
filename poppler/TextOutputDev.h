@@ -12,7 +12,7 @@
 //
 // Copyright (C) 2005-2007 Kristian Høgsberg <krh@redhat.com>
 // Copyright (C) 2006 Ed Catmur <ed@catmur.co.uk>
-// Copyright (C) 2007 Carlos Garcia Campos <carlosgc@gnome.org>
+// Copyright (C) 2007-2008 Carlos Garcia Campos <carlosgc@gnome.org>
 // Copyright (C) 2007 Adrian Johnson <ajohnson@redneon.com>
 // Copyright (C) 2008 Albert Astals Cid <aacid@kde.org>
 //
@@ -466,8 +466,8 @@ public:
   // Constructor.
   TextPage(GBool rawOrderA);
 
-  // Destructor.
-  ~TextPage();
+  void incRefCnt();
+  void decRefCnt();
 
   // Start a new page.
   void startPage(GfxState *state);
@@ -560,7 +560,10 @@ public:
 #endif
 
 private:
-
+  
+  // Destructor.
+  ~TextPage();
+  
   void clear();
   void assignColumns(TextLineFrag *frags, int nFrags, int rot);
   int dumpFragment(Unicode *text, int len, UnicodeMap *uMap, GooString *s);
@@ -599,6 +602,8 @@ private:
   GooList *underlines;		// [TextUnderline]
   GooList *links;		// [TextLink]
 
+  int refCnt;
+
   friend class TextLine;
   friend class TextLineFrag;
   friend class TextBlock;
@@ -607,6 +612,33 @@ private:
   friend class TextSelectionPainter;
   friend class TextSelectionDumper;
 };
+
+//------------------------------------------------------------------------
+// ActualText
+//------------------------------------------------------------------------
+
+class ActualText {
+public:
+  // Create an ActualText
+  ActualText(TextPage *out);
+  ~ActualText();
+
+  void addChar(GfxState *state, double x, double y,
+	       double dx, double dy,
+	       CharCode c, int nBytes, Unicode *u, int uLen);
+  void beginMC(Dict *properties);
+  void endMC(GfxState *state);
+
+private:
+  TextPage *text;
+  int actualTextBMCLevel;       // > 0 when inside ActualText span. Incremented
+                                // for each nested BMC inside the span.
+  GooString *actualText;        // replacement text for the span
+  GBool newActualTextSpan;      // true at start of span. used to init the extent
+  double actualText_x, actualText_y; // extent of the text inside the span
+  double actualText_dx, actualText_dy;
+};
+  
 
 //------------------------------------------------------------------------
 // TextOutputDev
@@ -750,12 +782,7 @@ private:
   GBool doHTML;			// extra processing for HTML conversion
   GBool ok;			// set up ok?
 
-  int actualTextBMCLevel;       // > 0 when inside ActualText span. Incremented
-                                // for each nested BMC inside the span.
-  GooString *actualText;        // replacement text for the span
-  GBool newActualTextSpan;      // true at start of span. used to init the extent
-  double actualText_x, actualText_y; // extent of the text inside the span
-  double actualText_dx, actualText_dy;
+  ActualText *actualText;
 };
 
 #endif

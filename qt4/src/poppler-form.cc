@@ -1,5 +1,6 @@
 /* poppler-form.h: qt4 interface to poppler
  * Copyright (C) 2007-2008, Pino Toscano <pino@kde.org>
+ * Copyright (C) 2008, Albert Astals Cid <aacid@kde.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,6 +23,7 @@
 
 #include <Form.h>
 #include <Object.h>
+#include <Link.h>
 
 #include "poppler-form.h"
 #include "poppler-page-private.h"
@@ -40,7 +42,7 @@ FormField::FormField(FormFieldData &dd)
   double left, top, right, bottom;
   m_formData->fm->getRect(&left, &bottom, &right, &top);
   // build a normalized transform matrix for this page at 100% scale
-  GfxState gfxState( 72.0, 72.0, m_formData->page->getMediaBox(), rotation, gTrue );
+  GfxState gfxState( 72.0, 72.0, m_formData->page->getCropBox(), rotation, gTrue );
   double * gfxCTM = gfxState.getCTM();
   double MTX[6];
   double pageWidth = m_formData->page->getCropWidth();

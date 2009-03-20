@@ -3,7 +3,7 @@
  * Copyright (C) 2005, Tobias Koening <tokoe@kde.org>
  * Copyright (C) 2005, Brad Hards <bradh@frogmouth.net>
  * Copyright (C) 2005-2008, Albert Astals Cid <aacid@kde.org>
- * Copyright (C) 2008, Pino Toscano <pino@kde.org>
+ * Copyright (C) 2008, 2009, Pino Toscano <pino@kde.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -108,6 +108,42 @@ FontInfo& FontInfo::operator=( const FontInfo &fi )
 
 	*m_data = *fi.m_data;
 	return *this;
+}
+
+
+FontIterator::FontIterator( int startPage, DocumentData *dd )
+	: d( new FontIteratorData( startPage, dd ) )
+{
+}
+
+FontIterator::~FontIterator()
+{
+	delete d;
+}
+
+QList<FontInfo> FontIterator::next()
+{
+	++d->currentPage;
+
+	QList<FontInfo> fonts;
+	GooList *items = d->fontInfoScanner.scan( 1 );
+	if ( !items )
+		return fonts;
+	for ( int i = 0; i < items->getLength(); ++i ) {
+		fonts.append( FontInfo( FontInfoData( ( ::FontInfo* )items->get( i ) ) ) );
+	}
+	deleteGooList( items, ::FontInfo );
+	return fonts;
+}
+
+bool FontIterator::hasNext() const
+{
+	return ( d->currentPage + 1 ) < d->totalPages;
+}
+
+int FontIterator::currentPage() const
+{
+	return d->currentPage;
 }
 
 }

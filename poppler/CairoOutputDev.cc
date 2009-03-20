@@ -23,6 +23,7 @@
 // Copyright (C) 2008 Adrian Johnson <ajohnson@redneon.com>
 // Copyright (C) 2008 Michael Vrable <mvrable@cs.ucsd.edu>
 // Copyright (C) 2008 Chris Wilson <chris@chris-wilson.co.uk>
+// Copyright (C) 2008 Hib Eris <hib@hiberis.nl>
 //
 // To see a description of the changes please see the Changelog file that
 // came with your tarball or type make ChangeLog if you are building from git
@@ -49,6 +50,7 @@
 #include "Link.h"
 #include "CharCodeToUnicode.h"
 #include "FontEncodingTables.h"
+#include "PDFDocEncoding.h"
 #include <fofi/FoFiTrueType.h>
 #include <splash/SplashBitmap.h>
 #include "CairoOutputDev.h"
@@ -135,6 +137,9 @@ CairoOutputDev::CairoOutputDev() {
   shape = NULL;
   cairo_shape = NULL;
   knockoutCount = 0;
+
+  text = NULL;
+  actualText = NULL;
 }
 
 CairoOutputDev::~CairoOutputDev() {
@@ -152,6 +157,10 @@ CairoOutputDev::~CairoOutputDev() {
     cairo_pattern_destroy (mask);
   if (shape)
     cairo_pattern_destroy (shape);
+  if (text) 
+    text->decRefCnt();
+  if (actualText)
+    delete actualText;  
 }
 
 void CairoOutputDev::setCairo(cairo_t *cairo)
@@ -172,6 +181,22 @@ void CairoOutputDev::setCairo(cairo_t *cairo)
   } else {
     this->cairo = NULL;
     this->cairo_shape = NULL;
+  }
+}
+
+void CairoOutputDev::setTextPage(TextPage *text)
+{
+  if (this->text) 
+    this->text->decRefCnt();
+  if (actualText)
+    delete actualText;
+  if (text) {
+    this->text = text;
+    this->text->incRefCnt();
+    actualText = new ActualText(text);
+  } else {
+    this->text = NULL;
+    actualText = NULL;
   }
 }
 
@@ -197,6 +222,16 @@ void CairoOutputDev::startPage(int pageNum, GfxState *state) {
 
   cairo_pattern_destroy(stroke_pattern);
   stroke_pattern = cairo_pattern_create_rgb(0., 0., 0.);
+
+  if (text)
+    text->startPage(state);
+}
+
+void CairoOutputDev::endPage() {
+  if (text) {
+    text->endPage();
+    text->coalesce(gTrue, gFalse);
+  }
 }
 
 void CairoOutputDev::drawLink(Link *link, Catalog *catalog) {
@@ -247,7 +282,7 @@ void CairoOutputDev::setDefaultCTM(double *ctm) {
   matrix.y0 = ctm[5];
 
   cairo_transform (cairo, &matrix);
-  if (shape)
+  if (cairo_shape)
       cairo_transform (cairo_shape, &matrix);
 
   OutputDev::setDefaultCTM(ctm);
@@ -410,12 +445,16 @@ void CairoOutputDev::updateStrokeOpacity(GfxState *state) {
 
 void CairoOutputDev::updateFont(GfxState *state) {
   cairo_font_face_t *font_face;
-  cairo_matrix_t matrix;
+  cairo_matrix_t matrix, invert_matrix;
 
   LOG(printf ("updateFont() font=%s\n", state->getFont()->getName()->getCString()));
 
   needFontUpdate = gFalse;
 
+  //FIXME: use cairo font engine?
+  if (text)
+    text->updateFont(state);
+  
   currentFont = fontEngine->getFont (state->getFont(), xref, catalog, printing);
 
   if (!currentFont)
@@ -438,6 +477,19 @@ void CairoOutputDev::updateFont(GfxState *state) {
   matrix.yy = -m[3] * fontSize;
   matrix.x0 = 0;
   matrix.y0 = 0;
+
+ /* Make sure the font matrix is invertible before setting it.  cairo
+  * will blow up if we give it a matrix that's not invertible, so we
+  * need to check before passing it to cairo_set_font_matrix. Ignoring it
+  * is likely to give better results than not rendering anything at
+  * all. See #18254.
+  */
+  invert_matrix = matrix;
+  if (cairo_matrix_invert(&invert_matrix)) {
+    warning("font matrix not invertible\n");
+    return;
+  }
+
   cairo_set_font_matrix (cairo, &matrix);
 }
 
@@ -554,13 +606,16 @@ void CairoOutputDev::drawChar(GfxState *state, double x, double y,
 			      double originX, double originY,
 			      CharCode code, int nBytes, Unicode *u, int uLen)
 {
-  if (!currentFont)
+  if (currentFont) {
+    glyphs[glyphCount].index = currentFont->getGlyph (code, u, uLen);
+    glyphs[glyphCount].x = x - originX;
+    glyphs[glyphCount].y = y - originY;
+    glyphCount++;
+  }
+
+  if (!text)
     return;
-  
-  glyphs[glyphCount].index = currentFont->getGlyph (code, u, uLen);
-  glyphs[glyphCount].x = x - originX;
-  glyphs[glyphCount].y = y - originY;
-  glyphCount++;
+  actualText->addChar (state, x, y, dx, dy, code, nBytes, u, uLen);
 }
 
 void CairoOutputDev::endString(GfxState *state)
@@ -701,7 +756,18 @@ void CairoOutputDev::endTextObject(GfxState *state) {
     cairo_path_destroy (textClipPath);
     textClipPath = NULL;
   }
+}
 
+void CairoOutputDev::beginMarkedContent(char *name, Dict *properties)
+{
+  if (text)
+    actualText->beginMC(properties);
+}
+
+void CairoOutputDev::endMarkedContent(GfxState *state)
+{
+  if (text)
+    actualText->endMC(state);
 }
 
 static inline int splashRound(SplashCoord x) {
@@ -1412,8 +1478,8 @@ void CairoOutputDev::drawMaskedImage(GfxState *state, Object *ref,
   /* ICCBased color space doesn't do any color correction
    * so check its underlying color space as well */
   is_identity_transform = colorMap->getColorSpace()->getMode() == csDeviceRGB ||
-		  colorMap->getColorSpace()->getMode() == csICCBased && 
-		  ((GfxICCBasedColorSpace*)colorMap->getColorSpace())->getAlt()->getMode() == csDeviceRGB;
+		  (colorMap->getColorSpace()->getMode() == csICCBased && 
+		   ((GfxICCBasedColorSpace*)colorMap->getColorSpace())->getAlt()->getMode() == csDeviceRGB);
 
   for (y = 0; y < height; y++) {
     dest = (unsigned int *) (buffer + y * 4 * width);
@@ -1528,8 +1594,8 @@ void CairoOutputDev::drawSoftMaskedImage(GfxState *state, Object *ref, Stream *s
   /* ICCBased color space doesn't do any color correction
    * so check its underlying color space as well */
   is_identity_transform = colorMap->getColorSpace()->getMode() == csDeviceRGB ||
-		  colorMap->getColorSpace()->getMode() == csICCBased && 
-		  ((GfxICCBasedColorSpace*)colorMap->getColorSpace())->getAlt()->getMode() == csDeviceRGB;
+		  (colorMap->getColorSpace()->getMode() == csICCBased && 
+		   ((GfxICCBasedColorSpace*)colorMap->getColorSpace())->getAlt()->getMode() == csDeviceRGB);
 
   for (y = 0; y < height; y++) {
     dest = (unsigned int *) (buffer + y * 4 * width);
@@ -1620,8 +1686,8 @@ void CairoOutputDev::drawImage(GfxState *state, Object *ref, Stream *str,
   /* ICCBased color space doesn't do any color correction
    * so check its underlying color space as well */
   is_identity_transform = colorMap->getColorSpace()->getMode() == csDeviceRGB ||
-		  colorMap->getColorSpace()->getMode() == csICCBased && 
-		  ((GfxICCBasedColorSpace*)colorMap->getColorSpace())->getAlt()->getMode() == csDeviceRGB;
+		  (colorMap->getColorSpace()->getMode() == csICCBased && 
+		   ((GfxICCBasedColorSpace*)colorMap->getColorSpace())->getAlt()->getMode() == csDeviceRGB);
 
   if (maskColors) {
     for (y = 0; y < height; y++) {

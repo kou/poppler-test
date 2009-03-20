@@ -1,5 +1,6 @@
 /* poppler-form.h: qt4 interface to poppler
  * Copyright (C) 2007-2008, Pino Toscano <pino@kde.org>
+ * Copyright (C) 2008, Albert Astals Cid <aacid@kde.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -62,7 +63,7 @@ namespace Poppler {
 
 	/**
 	   \return The size of the field, in normalized coordinates, i.e.
-	   [0..1] wrt the size of the page
+	   [0..1] with regard to the dimensions (cropbox) of the page
 	*/
 	QRectF rect() const;
 

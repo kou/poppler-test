@@ -47,7 +47,7 @@
 //------------------------------------------------------------------------
 
 // copyright notice
-#define popplerCopyright "Copyright 2005-2008 The Poppler Developers - http://poppler.freedesktop.org"
+#define popplerCopyright "Copyright 2005-2009 The Poppler Developers - http://poppler.freedesktop.org"
 #define xpdfCopyright "Copyright 1996-2004 Glyph & Cog, LLC"
 
 //------------------------------------------------------------------------
@@ -69,12 +69,8 @@
 // Win32 stuff
 //------------------------------------------------------------------------
 
-#ifdef CDECL
-#undef CDECL
-#endif
-
-#if defined(_MSC_VER) || defined(__BORLANDC__)
-#define CDECL __cdecl
+#ifdef WIN32
+#include <windef.h>
 #else
 #define CDECL
 #endif

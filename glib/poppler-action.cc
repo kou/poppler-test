@@ -19,18 +19,7 @@
 #include "poppler.h"
 #include "poppler-private.h"
 
-GType
-poppler_dest_get_type (void)
-{
-  static GType our_type = 0;
-
-  if (our_type == 0)
-    our_type = g_boxed_type_register_static ("PopplerDest",
-					     (GBoxedCopyFunc) poppler_dest_copy,
-					     (GBoxedFreeFunc) poppler_dest_free);
-
-  return our_type;
-}
+POPPLER_DEFINE_BOXED_TYPE (PopplerDest, poppler_dest, poppler_dest_copy, poppler_dest_free)
 
 /**
  * poppler_dest_copy:
@@ -73,18 +62,7 @@ poppler_dest_free (PopplerDest *dest)
 	g_free (dest);
 }
 
-GType
-poppler_action_get_type (void)
-{
-  static GType our_type = 0;
-
-  if (our_type == 0)
-    our_type = g_boxed_type_register_static ("PopplerAction",
-					     (GBoxedCopyFunc) poppler_action_copy,
-					     (GBoxedFreeFunc) poppler_action_free);
-
-  return our_type;
-}
+POPPLER_DEFINE_BOXED_TYPE (PopplerAction, poppler_action, poppler_action_copy, poppler_action_free)
 
 /**
  * poppler_action_free:
@@ -321,8 +299,7 @@ build_goto_remote (PopplerAction *action,
 		return;
 	}
 
-	if (link->getFileName()->getCString ())
-		action->goto_remote.file_name = g_strdup (link->getFileName()->getCString ());
+	action->goto_remote.file_name = _poppler_goo_string_to_utf8 (link->getFileName());
 
 	link_dest = link->getDest ();
 	named_dest = link->getNamedDest ();

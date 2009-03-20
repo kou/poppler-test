@@ -6,6 +6,7 @@
 // Copyright (C) 2005-2008 Albert Astals Cid <aacid@kde.org>
 // Copyright (C) 2005 Brad Hards <bradh@frogmouth.net>
 // Copyright (C) 2006 Kouhei Sutou <kou@cozmixng.org>
+// Copyright (C) 2009 Pino Toscano <pino@kde.org>
 //
 // To see a description of the changes please see the Changelog file that
 // came with your tarball or type make ChangeLog if you are building from git
@@ -35,9 +36,9 @@
 #include "PDFDoc.h"
 #include "FontInfo.h"
 
-FontInfoScanner::FontInfoScanner(PDFDoc *docA) {
+FontInfoScanner::FontInfoScanner(PDFDoc *docA, int firstPage) {
   doc = docA;
-  currentPage = 1;
+  currentPage = firstPage + 1;
   fonts = NULL;
   fontsLen = fontsSize = 0;
   visitedXObjects = NULL;

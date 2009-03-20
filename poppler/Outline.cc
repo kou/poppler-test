@@ -14,6 +14,8 @@
 // under GPL version 2 or later
 //
 // Copyright (C) 2005 Marco Pesenti Gritti <mpg@redhat.com>
+// Copyright (C) 2008 Albert Astals Cid <aacid@kde.org>
+// Copyright (C) 2009 Nick Jones <nick.jones@network-box.com>
 //
 // To see a description of the changes please see the Changelog file that
 // came with your tarball or type make ChangeLog if you are building from git
@@ -29,6 +31,7 @@
 #include "goo/gmem.h"
 #include "goo/GooString.h"
 #include "goo/GooList.h"
+#include "XRef.h"
 #include "Link.h"
 #include "PDFDocEncoding.h"
 #include "Outline.h"
@@ -128,17 +131,29 @@ OutlineItem::~OutlineItem() {
 GooList *OutlineItem::readItemList(Object *firstItemRef, Object *lastItemRef,
 				 XRef *xrefA) {
   GooList *items;
+  char* alreadyRead;
   OutlineItem *item;
   Object obj;
   Object *p;
 
+  if (!lastItemRef->isRef())
+    return NULL;
+
   items = new GooList();
+
+  alreadyRead = (char *)gmalloc(xrefA->getNumObjects());
+  memset(alreadyRead, 0, xrefA->getNumObjects());
+
   p = firstItemRef;
-  while (p->isRef()) {
+  while (p->isRef() && 
+	 (p->getRefNum() >= 0) && 
+         (p->getRefNum() < xrefA->getNumObjects()) && 
+         !alreadyRead[p->getRefNum()]) {
     if (!p->fetch(xrefA, &obj)->isDict()) {
       obj.free();
       break;
     }
+    alreadyRead[p->getRefNum()] = 1;
     item = new OutlineItem(obj.getDict(), xrefA);
     obj.free();
     items->append(item);
@@ -148,6 +163,8 @@ GooList *OutlineItem::readItemList(Object *firstItemRef, Object *lastItemRef,
     }
     p = &item->nextRef;
   }
+
+  gfree(alreadyRead);
 
   if (!items->getLength()) {
     delete items;

@@ -6,6 +6,8 @@ INCLUDES = 					\
 	-DGTK_DISABLE_DEPRECATED		\
 	$(POPPLER_GLIB_DISABLE_SINGLE_INCLUDES)
 
+AM_LDFLAGS = @auto_import_flags@
+
 if BUILD_GTK_TEST
 noinst_PROGRAMS = poppler-glib-demo
 endif
@@ -16,6 +18,8 @@ poppler_glib_demo_SOURCES = 			\
 	annots.c				\
 	attachments.c				\
 	attachments.h				\
+	find.h					\
+	find.c					\
 	fonts.h					\
 	fonts.c					\
 	forms.h					\
@@ -34,6 +38,8 @@ poppler_glib_demo_SOURCES = 			\
 	page.c					\
 	render.h				\
 	render.c				\
+	text.h					\
+	text.c					\
 	transitions.h				\
 	transitions.c				\
 	utils.h					\

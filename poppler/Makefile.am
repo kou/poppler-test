@@ -105,6 +105,10 @@ abiword_libs =					\
 
 endif
 
+if USE_CMS
+cms_libs = -llcms
+endif
+
 INCLUDES =					\
 	-I$(top_srcdir)				\
 	-I$(top_srcdir)/goo			\
@@ -126,6 +130,7 @@ CXXFLAGS+=$(PTHREAD_CFLAGS)
 libpoppler_la_LIBADD =				\
 	$(top_builddir)/goo/libgoo.la		\
 	$(top_builddir)/fofi/libfofi.la		\
+	$(cms_libs)				\
 	$(splash_libs)				\
 	$(libjpeg_libs)				\
 	$(zlib_libs)				\
@@ -145,7 +150,6 @@ poppler_include_HEADERS =	\
 	$(splash_headers)	\
 	Annot.h			\
 	Array.h			\
-	BaseFile.h		\
 	BuiltinFont.h		\
 	BuiltinFontTables.h	\
 	Catalog.h		\
@@ -159,7 +163,6 @@ poppler_include_HEADERS =	\
 	FontEncodingTables.h	\
 	FontInfo.h		\
 	Form.h 			\
-	Function.cc		\
 	Function.h		\
 	Gfx.h			\
 	GfxFont.h		\

@@ -1,11 +1,16 @@
 AC_PREREQ(2.59)
 AC_INIT(poppler, 0.10.0)
+AC_CONFIG_MACRO_DIR([m4])
 AM_INIT_AUTOMAKE([foreign])
 AM_CONFIG_HEADER(config.h)
 AM_CONFIG_HEADER(poppler/poppler-config.h)
 
-dnl ##### Checks for programs.
+dnl ##### Initialize libtool.
+AC_LIBTOOL_WIN32_DLL
+define([AC_LIBTOOL_LANG_F77_CONFIG], [:])
 AC_PROG_LIBTOOL
+
+dnl ##### Checks for programs.
 AC_PROG_CC
 AC_PROG_CXX
 AC_ISC_POSIX
@@ -18,6 +23,9 @@ AC_PROG_INSTALL
 AC_CHECK_FUNC(gettimeofday, AC_DEFINE(HAVE_GETTIMEOFDAY, 1, [Defines if gettimeofday is available on your system]))
 AC_CHECK_FUNC(localtime_r, AC_DEFINE(HAVE_LOCALTIME_R, 1, [Defines if localtime_r is available on your system]))
 
+dnl ##### Check for pkgconfig
+PKG_PROG_PKG_CONFIG
+
 dnl Enable these unconditionally.
 AC_DEFINE([OPI_SUPPORT], [1], [Generate OPI comments in PS output.])
 AC_DEFINE([MULTITHREADED], [1], [Enable multithreading support.])
@@ -26,15 +34,18 @@ AC_DEFINE([TEXTOUT_WORD_LIST], [1], [Enable word list support.])
 dnl Check for OS specific flags
 win32_libs=""
 create_shared_lib=""
+auto_import_flags=""
 case "$host_os" in
   mingw*)
     win32_libs="-lgdi32"
     create_shared_lib="-no-undefined"
+    auto_import_flags="-Wl,--enable-auto-import"
   ;;
 esac
 
 AC_SUBST(win32_libs)
 AC_SUBST(create_shared_lib)
+AC_SUBST(auto_import_flags)
 
 ACX_PTHREAD()
 
@@ -70,6 +81,20 @@ AC_CHECK_FUNC(gethostbyname)
 if test $ac_cv_func_gethostbyname = no; then
   AC_CHECK_LIB(bsd, gethostbyname, X_EXTRA_LIBS="$X_EXTRA_LIBS -lbsd")
 fi
+
+AC_CHECK_FUNC(nanosleep,,)
+dnl try in librt if not found in current LIBS
+if test x$ac_cv_func_nanosleep = xno
+then
+   AC_CHECK_LIB(rt,nanosleep, X_EXTRA_LIBS="$X_EXTRA_LIBS -lrt")
+fi
+
+dnl try in libposix4, if not found so far
+if test x$ac_cv_func_nanosleep = xno && test x$ac_cv_lib_rt_nanosleep = xno
+then
+   AC_CHECK_LIB(posix4,nanosleep, X_EXTRA_LIBS="$X_EXTRA_LIBS -lposix4")
+fi
+
 
 dnl ##### Checks for library functions.
 AC_CHECK_FUNCS(popen mkstemp mkstemps)
@@ -160,6 +185,19 @@ AM_CONDITIONAL(BUILD_LIBJPEG, test x$enable_libjpeg = xyes)
 AH_TEMPLATE([ENABLE_LIBJPEG],
             [Use libjpeg instead of builtin jpeg decoder.])
 
+dnl Test for libpng
+AC_ARG_ENABLE(libpng,
+	      AC_HELP_STRING([--disable-libpng],
+	                     [Don't build against libpng.]),
+              enable_libpng=$enableval,
+              enable_libpng="try")
+if test x$enable_libpng != xno; then
+  POPPLER_FIND_PNG
+fi
+
+AM_CONDITIONAL(BUILD_LIBPNG, test x$enable_libpng = xyes)
+AH_TEMPLATE([ENABLE_LIBPNG],
+            [Build against libpng.])
 
 dnl Check for freetype headers
 FREETYPE_LIBS=
@@ -436,6 +474,24 @@ AC_ARG_ENABLE(compile-warnings,
                              [Turn on compiler warnings.]),,
               [enable_compile_warnings="yes"])
 
+dnl
+dnl   Color Management
+dnl
+
+AC_ARG_ENABLE(cms,
+	      AC_HELP_STRING([--disable-cms],
+	                     [Don't use color management system.]),
+              enable_cms=$enableval,
+              enable_cms="yes")
+if test x$enable_cms = xyes; then
+  AC_CHECK_LIB([lcms],cmsOpenProfileFromFile,,
+	       AC_MSG_ERROR("*** lcms library not found ***"))
+  AC_CHECK_HEADERS([lcms.h],,
+		   AC_MSG_ERROR("*** lcms headers not found ***"))
+  AC_DEFINE(USE_CMS, 1, [Defines if use cms])
+fi
+AM_CONDITIONAL(USE_CMS, test x$enable_cms = xyes)
+
 if test "x$GCC" != xyes; then
   enable_compile_warnings=no
 fi
@@ -502,8 +558,10 @@ echo "  glib wrapper:       $enable_poppler_glib"
 echo "    use GDK:          $enable_gdk"
 echo "  use gtk-doc:        $enable_gtk_doc"
 echo "  use libjpeg:        $enable_libjpeg"
+echo "  use libpng:         $enable_libpng"
 echo "  use zlib:           $enable_zlib"
 echo "  use libopenjpeg:    $enable_libopenjpeg"
+echo "  use cms:            $enable_cms"
 echo "  command line utils: $enable_utils"
 echo "  use cutter:         $enable_cutter"
 echo ""

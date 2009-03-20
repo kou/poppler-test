@@ -2,7 +2,7 @@
  * Copyright (C) 2005, Net Integration Technologies, Inc.
  * Copyright (C) 2005, 2008, Brad Hards <bradh@frogmouth.net>
  * Copyright (C) 2006-2008 by Albert Astals Cid <aacid@kde.org>
- * Copyright (C) 2007-2008 by Pino Toscano <pino@kde.org>
+ * Copyright (C) 2007-2009 by Pino Toscano <pino@kde.org>
  * Inspired on code by
  * Copyright (C) 2004 by Albert Astals Cid <tsdgeos@terra.es>
  * Copyright (C) 2004 by Enrico Ros <eros.kde@email.it>
@@ -26,14 +26,11 @@
 #define _POPPLER_PRIVATE_H_
 
 #include <QtCore/QPointer>
-#include <QtCore/QVariant>
 #include <QtCore/QVector>
 
 #include <config.h>
 #include <GfxState.h>
 #include <GlobalParams.h>
-#include <Link.h>
-#include <Outline.h>
 #include <PDFDoc.h>
 #include <FontInfo.h>
 #include <OutputDev.h>
@@ -44,6 +41,7 @@
 
 #include "poppler-qt4.h"
 
+class LinkDest;
 class FormWidget;
 
 namespace Poppler {
@@ -92,7 +90,7 @@ namespace Poppler {
 	
 	void init(GooString *ownerPassword, GooString *userPassword)
 	    {
-		m_fontInfoScanner = 0;
+		m_fontInfoIterator = 0;
 		m_backend = Document::SplashBackend;
 		m_outputDev = 0;
 		paperColor = Qt::white;
@@ -116,7 +114,7 @@ namespace Poppler {
 		delete (OptContentModel *)m_optContentModel;
 		delete doc;
 		delete m_outputDev;
-		delete m_fontInfoScanner;
+		delete m_fontInfoIterator;
 		
 		count --;
 		if ( count == 0 ) delete globalParams;
@@ -150,65 +148,7 @@ namespace Poppler {
 		return m_outputDev;
 	}
 	
-	void addTocChildren( QDomDocument * docSyn, QDomNode * parent, GooList * items )
-	{
-		int numItems = items->getLength();
-		for ( int i = 0; i < numItems; ++i )
-		{
-			// iterate over every object in 'items'
-			OutlineItem * outlineItem = (OutlineItem *)items->get( i );
-			
-			// 1. create element using outlineItem's title as tagName
-			QString name;
-			Unicode * uniChar = outlineItem->getTitle();
-			int titleLength = outlineItem->getTitleLength();
-			name = unicodeToQString(uniChar, titleLength);
-			if ( name.isEmpty() )
-				continue;
-			
-			QDomElement item = docSyn->createElement( name );
-			parent->appendChild( item );
-			
-			// 2. find the page the link refers to
-			::LinkAction * a = outlineItem->getAction();
-			if ( a && ( a->getKind() == actionGoTo || a->getKind() == actionGoToR ) )
-			{
-				// page number is contained/referenced in a LinkGoTo
-				LinkGoTo * g = static_cast< LinkGoTo * >( a );
-				LinkDest * destination = g->getDest();
-				if ( !destination && g->getNamedDest() )
-				{
-					// no 'destination' but an internal 'named reference'. we could
-					// get the destination for the page now, but it's VERY time consuming,
-					// so better storing the reference and provide the viewport on demand
-					GooString *s = g->getNamedDest();
-					QChar *charArray = new QChar[s->getLength()];
-					for (int i = 0; i < s->getLength(); ++i) charArray[i] = QChar(s->getCString()[i]);
-					QString aux(charArray, s->getLength());
-					item.setAttribute( "DestinationName", aux );
-					delete[] charArray;
-				}
-				else if ( destination && destination->isOk() )
-				{
-					LinkDestinationData ldd(destination, NULL, this);
-					item.setAttribute( "Destination", LinkDestination(ldd).toString() );
-				}
-				if ( a->getKind() == actionGoToR )
-				{
-					LinkGoToR * g2 = static_cast< LinkGoToR * >( a );
-					item.setAttribute( "ExternalFileName", g2->getFileName()->getCString() );
-				}
-			}
-
-			item.setAttribute( "Open", QVariant( (bool)outlineItem->isOpen() ).toString() );
-
-			// 3. recursively descend over children
-			outlineItem->open();
-			GooList * children = outlineItem->getKids();
-			if ( children )
-				addTocChildren( docSyn, &item, children );
-		}
-	}
+	void addTocChildren( QDomDocument * docSyn, QDomNode * parent, GooList * items );
 	
 	void setPaperColor(const QColor &color)
 	{
@@ -239,7 +179,7 @@ namespace Poppler {
 	
 	void fillMembers()
 	{
-		m_fontInfoScanner = new FontInfoScanner(doc);
+		m_fontInfoIterator = new FontIterator(0, this);
 		int numEmb = doc->getCatalog()->numEmbeddedFiles();
 		if (!(0 == numEmb)) {
 			// we have some embedded documents, build the list
@@ -255,7 +195,7 @@ namespace Poppler {
 	PDFDoc *doc;
 	QByteArray fileContents;
 	bool locked;
-	FontInfoScanner *m_fontInfoScanner;
+	FontIterator *m_fontInfoIterator;
 	Document::RenderBackend m_backend;
 	OutputDev *m_outputDev;
 	QList<EmbeddedFile*> m_embeddedFiles;
@@ -301,6 +241,25 @@ namespace Poppler {
 		bool isSubset : 1;
 		FontInfo::Type type;
 		Ref embRef;
+    };
+
+    class FontIteratorData
+    {
+	public:
+		FontIteratorData( int startPage, DocumentData *dd )
+		  : fontInfoScanner( dd->doc, startPage )
+		  , totalPages( dd->doc->getNumPages() )
+		  , currentPage( qMax( startPage, 0 ) - 1 )
+		{
+		}
+
+		~FontIteratorData()
+		{
+		}
+
+		FontInfoScanner fontInfoScanner;
+		int totalPages;
+		int currentPage;
     };
 
     class TextBoxData

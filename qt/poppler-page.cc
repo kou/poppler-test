@@ -31,6 +31,7 @@
 #include <Catalog.h>
 #include <ErrorCodes.h>
 #include <TextOutputDev.h>
+#include <Link.h>
 #if defined(HAVE_SPLASH)
 #include <SplashOutputDev.h>
 #include <splash/SplashBitmap.h>
@@ -277,9 +278,9 @@ QValueList<Link*> Page::links() const
         {
           LinkGoToR * g = (LinkGoToR *) a;
           // copy link file
-          const char * fileName = g->getFileName()->getCString();
+          const QString fileName = UnicodeParsedString( g->getFileName() );
           // ceate link: fileName, namedDest, object pointer
-          popplerLink = new LinkGoto( linkArea, (QString)fileName, LinkDestination( LinkDestinationData(g->getDest(), g->getNamedDest(), data->doc->data ) ) );
+          popplerLink = new LinkGoto( linkArea, fileName, LinkDestination( LinkDestinationData(g->getDest(), g->getNamedDest(), data->doc->data ) ) );
         }
         break;
 

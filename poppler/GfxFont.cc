@@ -10,7 +10,7 @@
 //
 // Modified under the Poppler project - http://poppler.freedesktop.org
 //
-// Copyright (C) 2005, 2006, 2008 Albert Astals Cid <aacid@kde.org>
+// Copyright (C) 2005, 2006, 2008, 2009 Albert Astals Cid <aacid@kde.org>
 // Copyright (C) 2005, 2006 Kristian Høgsberg <krh@redhat.com>
 // Copyright (C) 2006 Takashi Iwai <tiwai@suse.de>
 // Copyright (C) 2007 Julien Rebetez <julienr@svn.gnome.org>
@@ -19,6 +19,7 @@
 // Copyright (C) 2007 Ed Catmur <ed@catmur.co.uk>
 // Copyright (C) 2008 Jonathan Kew <jonathan_kew@sil.org>
 // Copyright (C) 2008 Ed Avis <eda@waniasset.com>
+// Copyright (C) 2008 Hib Eris <hib@hiberis.nl>
 //
 // To see a description of the changes please see the Changelog file that
 // came with your tarball or type make ChangeLog if you are building from git
@@ -838,7 +839,7 @@ Gfx8BitFont::Gfx8BitFont(XRef *xref, char *tagA, Ref idA, GooString *nameA,
 	  // if the 'mapUnknownCharNames' flag is set, do a simple pass-through
 	  // mapping for unknown character names
 	  if (charName && charName[0]) {
-	    for (n = 0; n < sizeof(uBuf)/sizeof(*uBuf); ++n)
+	    for (n = 0; n < (int)(sizeof(uBuf)/sizeof(*uBuf)); ++n)
 	      if (!(uBuf[n] = charName[n]))
 		break;
 	    ctu->setMapping((CharCode)code, uBuf, n);
@@ -1057,7 +1058,8 @@ static int parseCharName(char *charName, Unicode *uBuf, int uLen,
     // restrictions mean that the "uni" prefix can be used only with Unicode
     // values from the Basic Multilingual Plane (BMP).
     if (n >= 7 && (n % 4) == 3 && !strncmp(charName, "uni", 3)) {
-      unsigned int i, m;
+      int i;
+      unsigned int m;
       for (i = 0, m = 3; i < uLen && m < n; m += 4) {
 	if (isxdigit(charName[m]) && isxdigit(charName[m + 1]) && 
 	    isxdigit(charName[m + 2]) && isxdigit(charName[m + 3])) {
@@ -1445,7 +1447,7 @@ GfxCIDFont::GfxCIDFont(XRef *xref, char *tagA, Ref idA, GooString *nameA,
   delete cMapName;
 
   // CIDToGIDMap (for embedded TrueType fonts)
-  if (type == fontCIDType2) {
+  if (type == fontCIDType2 || type == fontCIDType2OT) {
     desFontDict->lookup("CIDToGIDMap", &obj1);
     if (obj1.isStream()) {
       cidToGIDLen = 0;
@@ -2054,7 +2056,7 @@ GfxFontDict::GfxFontDict(XRef *xref, Ref *fontDictRef, Dict *fontDict) {
 	// NULL and !isOk() so that when we do lookups
 	// we can tell the difference between a missing font
 	// and a font that is just !isOk()
-	delete fonts[i];
+	fonts[i]->decRefCnt();
 	fonts[i] = NULL;
       }
     } else {

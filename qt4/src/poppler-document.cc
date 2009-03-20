@@ -2,7 +2,7 @@
  * Copyright (C) 2005, Net Integration Technologies, Inc.
  * Copyright (C) 2005, 2008, Brad Hards <bradh@frogmouth.net>
  * Copyright (C) 2005-2008, Albert Astals Cid <aacid@kde.org>
- * Copyright (C) 2006-2008, Pino Toscano <pino@kde.org>
+ * Copyright (C) 2006-2009, Pino Toscano <pino@kde.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -181,7 +181,11 @@ namespace Poppler {
     QList<FontInfo> Document::fonts() const
     {
 	QList<FontInfo> ourList;
-	scanForFonts(numPages(), &ourList);
+	FontIterator it( 0, m_doc );
+	while ( it.hasNext() )
+	{
+		ourList += it.next();
+	}
 	return ourList;
     }
 
@@ -192,16 +196,21 @@ namespace Poppler {
 
     bool Document::scanForFonts( int numPages, QList<FontInfo> *fontList ) const
     {
-	GooList *items = m_doc->m_fontInfoScanner->scan( numPages );
-
-	if ( NULL == items )
-	    return false;
-
-	for ( int i = 0; i < items->getLength(); ++i ) {
-	    fontList->append( FontInfo(FontInfoData((::FontInfo*)items->get(i))) );
+	if ( !m_doc->m_fontInfoIterator )
+		return false;
+	if ( !m_doc->m_fontInfoIterator->hasNext() )
+		return false;
+	while ( m_doc->m_fontInfoIterator->hasNext() && numPages )
+	{
+		(*fontList) += m_doc->m_fontInfoIterator->next();
+		--numPages;
 	}
-	deleteGooList(items, ::FontInfo);
 	return true;
+    }
+
+    FontIterator* Document::newFontIterator( int startPage ) const
+    {
+	return new FontIterator( startPage, m_doc );
     }
 
     QByteArray Document::fontData(const FontInfo &fi) const

@@ -1,4 +1,4 @@
-add_definitions(-DG_LOG_DOMAIN=\\"Poppler\\" ${GLIB2_CFLAGS})
+add_definitions(-DG_LOG_DOMAIN=\"Poppler\" ${GLIB2_CFLAGS})
 
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}
@@ -80,6 +80,7 @@ set(poppler_glib_SRCS
   poppler-attachment.cc
   poppler-form-field.cc
   poppler-annot.cc
+  poppler-layer.cc
   poppler.cc
   ${CMAKE_CURRENT_BINARY_DIR}/poppler-enums.c
 )
