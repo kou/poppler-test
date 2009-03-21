@@ -1,6 +1,6 @@
 /* -*- c-file-style: "gnu" -*- */
 /*
- * Copyright (C) 2008  Kouhei Sutou <kou@cozmixng.org>
+ * Copyright (C) 2008-2009  Kouhei Sutou <kou@cozmixng.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,6 +17,8 @@
  * Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+#include <string.h>
+
 #include <poppler.h>
 #include "lib/poppler-test-utils.h"
 
@@ -29,6 +31,7 @@ void test_save_a_copy (void);
 void test_property (void);
 void test_font (void);
 void test_action (void);
+void test_attachment (void);
 
 static PopplerDocument *document;
 static GList *expected_font_names, *actual_font_names;
@@ -460,4 +463,83 @@ test_action (void)
 
   gcut_assert_equal_list_enum (POPPLER_TYPE_ACTION_TYPE,
                                expected_action_types, actual_action_types);
+}
+
+static PopplerAttachment *
+attachment_new (const gchar *name, const gchar *description,
+                gsize size, GTime mtime, GTime ctime, gchar *checksum)
+{
+  PopplerAttachment *attachment;
+
+  attachment = g_object_new (POPPLER_TYPE_ATTACHMENT, NULL);
+  attachment->name = g_strdup (name);
+  attachment->description = g_strdup (description);
+  attachment->size = size;
+  attachment->mtime = mtime;
+  attachment->ctime = ctime;
+  attachment->checksum = g_string_new_len (checksum, strlen (checksum));
+}
+
+static gboolean
+attachment_equal (gconstpointer data1, gconstpointer data2)
+{
+  const PopplerAttachment *attachment1 = data1;
+  const PopplerAttachment *attachment2 = data2;
+
+  return
+    cut_equal_string (attachment1->name, attachment2->name) &&
+    cut_equal_string (attachment1->description, attachment2->description) &&
+    attachment1->size == attachment2->size &&
+    attachment1->mtime == attachment2->mtime &&
+    attachment1->ctime == attachment2->ctime &&
+    cut_equal_string (attachment1->checksum->str, attachment2->checksum->str);
+}
+
+static void
+attachment_inspect (GString *string, gconstpointer data, gpointer user_data)
+{
+  const PopplerAttachment *attachment = data;
+
+  g_string_append (string, "#<PopplerAttachment ");
+  g_string_append_printf (string, "name=<%s>, ", attachment->name);
+  g_string_append_printf (string, "description=<%s>, ", attachment->description);
+  g_string_append_printf (string, "size=<%" G_GSIZE_FORMAT ">, ",
+                          attachment->size);
+  g_string_append_printf (string, "mtime=<%d>, ", attachment->mtime);
+  g_string_append_printf (string, "ctime=<%d>, ", attachment->ctime);
+  g_string_append_printf (string, "checksum=<%s>", attachment->checksum->str);
+  g_string_append (string, ">");
+}
+
+void
+test_attachment (void)
+{
+  GList *attachments, *node;
+  GList *expected = NULL, *actual = NULL;
+
+  document = load_document ("attachment.pdf");
+  cut_assert_true (poppler_document_has_attachments (document));
+
+  expected = g_list_append (expected,
+                            attachment_new ("hello.html", "hello.html", 300,
+                                            0, 0, ""));
+  expected = g_list_append (expected,
+                            attachment_new ("hello.txt", "hello.txt", 13,
+                                            0, 0, ""));
+
+  attachments = poppler_document_get_attachments (document);
+  for (node = attachments; node; node = g_list_next (node))
+    {
+      PopplerAttachment *attachment = node->data;
+
+      actual = g_list_append (actual, attachment);
+    }
+
+  gcut_take_list (expected, g_object_unref);
+  gcut_take_list (actual, g_object_unref);
+  gcut_assert_equal_list (expected,
+                          actual,
+                          attachment_equal,
+                          attachment_inspect,
+                          NULL);
 }
