@@ -54,7 +54,7 @@ setup (void)
                             NULL);
 
   tmp_base_dir = g_build_filename (poppler_test_get_base_dir (), "tmp", NULL);
-  cut_remove_path (tmp_base_dir);
+  cut_remove_path (tmp_base_dir, NULL);
 
   tmp_dir = g_build_filename (tmp_base_dir, "document", NULL);
   g_mkdir_with_parents (tmp_dir, 0755);
@@ -81,7 +81,7 @@ teardown (void)
 
   if (tmp_base_dir)
     {
-      cut_remove_path (tmp_base_dir);
+      cut_remove_path (tmp_base_dir, NULL);
       g_free (tmp_base_dir);
     }
 }
