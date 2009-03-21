@@ -33,8 +33,10 @@ void test_font (void);
 void test_action (void);
 void test_no_attachment (void);
 void test_attachment (void);
+void test_attachment_save (void);
 
 static PopplerDocument *document;
+static GList *attachments;
 static GList *expected_font_names, *actual_font_names;
 static GList *expected_action_types, *actual_action_types;
 
@@ -45,6 +47,8 @@ void
 setup (void)
 {
   document = NULL;
+
+  attachments = NULL;
 
   expected_font_names = NULL;
   actual_font_names = NULL;
@@ -67,6 +71,12 @@ setup (void)
 void
 teardown (void)
 {
+  if (attachments)
+    {
+      g_list_foreach (attachments, (GFunc) g_object_unref, NULL);
+      g_list_free (attachments);
+    }
+
   if (document)
     g_object_unref (document);
 
@@ -540,7 +550,7 @@ test_attachment (void)
     {
       PopplerAttachment *attachment = node->data;
 
-      actual = g_list_append (actual, attachment);
+      actual = g_list_append (actual, g_object_ref (attachment));
     }
 
   gcut_take_list (expected, g_object_unref);
@@ -550,4 +560,35 @@ test_attachment (void)
                           attachment_equal,
                           attachment_inspect,
                           NULL);
+}
+
+void
+test_attachment_save (void)
+{
+  GList *attachments, *node;
+
+  document = load_document ("attachment.pdf");
+  cut_assert_true (poppler_document_has_attachments (document));
+
+  attachments = poppler_document_get_attachments (document);
+  for (node = attachments; node; node = g_list_next (node))
+    {
+      PopplerAttachment *attachment = node->data;
+      const gchar *filename;
+      gchar *contents;
+      const gchar *expected_contents;
+      GError *error = NULL;
+
+      filename = cut_take_string (g_build_filename (tmp_dir,
+                                                    attachment->name,
+                                                    NULL));
+      poppler_attachment_save (attachment, filename, &error);
+      gcut_assert_error (error);
+
+      g_file_get_contents (filename, &contents, NULL, &error);
+      gcut_assert_error (error);
+      expected_contents = cut_get_fixture_data_string (attachment->name, NULL);
+      cut_set_message ("%s", attachment->name);
+      cut_assert_equal_string_with_free (expected_contents, contents);
+    }
 }
