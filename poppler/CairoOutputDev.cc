@@ -132,6 +132,7 @@ CairoOutputDev::CairoOutputDev() {
   t3_glyph_has_bbox = gFalse;
 
   groupColorSpaceStack = NULL;
+  maskStack = NULL;
   group = NULL;
   mask = NULL;
   shape = NULL;
@@ -242,6 +243,11 @@ void CairoOutputDev::saveState(GfxState *state) {
   cairo_save (cairo);
   if (cairo_shape)
       cairo_save (cairo_shape);
+
+  MaskStack *ms = new MaskStack;
+  ms->mask = cairo_pattern_reference(mask);
+  ms->next = maskStack;
+  maskStack = ms;
 }
 
 void CairoOutputDev::restoreState(GfxState *state) {
@@ -256,6 +262,14 @@ void CairoOutputDev::restoreState(GfxState *state) {
   updateStrokeColor(state);
   updateFillOpacity(state);
   updateStrokeOpacity(state);
+
+  MaskStack* ms = maskStack;
+  if (mask)
+    cairo_pattern_destroy(mask);
+
+  mask = ms->mask;
+  maskStack = ms->next;
+  delete ms;
 }
 
 void CairoOutputDev::updateAll(GfxState *state) {
@@ -935,8 +949,22 @@ void CairoOutputDev::setSoftMask(GfxState * state, double * bbox, GBool alpha,
      * So we paint the group to an image surface convert it to a luminocity map
      * and then use that as the mask. */
 
-    double x1, y1, x2, y2;
+    double x1, y1, x2, y2, tmp;
     cairo_clip_extents(cairo, &x1, &y1, &x2, &y2);
+    cairo_user_to_device(cairo, &x1, &y1);
+    cairo_user_to_device(cairo, &x2, &y2);
+    if (x1 > x2) {
+      tmp = x1;
+      x1 = x2;
+      x2 = tmp;
+    }
+
+    if (y1 > y2) {
+      tmp = y1;
+      y1 = y2;
+      y2 = tmp;
+    }
+
     int width = (int)(ceil(x2) - floor(x1));
     int height = (int)(ceil(y2) - floor(y1));
 
@@ -1024,7 +1052,9 @@ void CairoOutputDev::popTransparencyGroup() {
 
 
 void CairoOutputDev::clearSoftMask(GfxState * /*state*/) {
-  //XXX: should we be doing anything here?
+  if (mask)
+    cairo_pattern_destroy(mask);
+  mask = NULL;
 }
 
 void CairoOutputDev::drawImageMask(GfxState *state, Object *ref, Stream *str,
