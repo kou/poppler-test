@@ -23,6 +23,7 @@
 #include <gcutter.h>
 
 void test_title (void);
+void test_visible (void);
 
 static PopplerDocument *document;
 
@@ -86,7 +87,35 @@ test_title (void)
                               g_strdup (poppler_layer_get_title (layer)));
     }
 
-  expected_titles = gcut_take_new_list_string ("layer1", "layer0", NULL);
+  expected_titles = gcut_take_new_list_string ("layer2", "layer1", "layer0",
+                                               NULL);
   gcut_assert_equal_list_string (expected_titles,
                                  gcut_take_list (titles, g_free));
+}
+
+void
+test_visible (void)
+{
+  const GList *layers, *node;
+  GList *visibilities = NULL;
+  const GList *expected_visibilities;
+
+  layers = load_layers ("layers.pdf");
+
+  for (node = layers; node; node = g_list_next (node))
+    {
+      PopplerLayer *layer = node->data;
+
+      if (poppler_layer_is_visible (layer))
+        visibilities = g_list_append (visibilities, g_strdup ("visible"));
+      else
+        visibilities = g_list_append (visibilities, g_strdup ("hidden"));
+    }
+
+  expected_visibilities = gcut_take_new_list_string ("visible",
+                                                     "hidden",
+                                                     "visible",
+                                                     NULL);
+  gcut_assert_equal_list_string (expected_visibilities,
+                                 gcut_take_list (visibilities, g_free));
 }
