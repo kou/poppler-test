@@ -31,6 +31,7 @@ void test_save_a_copy (void);
 void test_property (void);
 void test_font (void);
 void test_action (void);
+void test_no_attachment (void);
 void test_attachment (void);
 
 static PopplerDocument *document;
@@ -509,6 +510,13 @@ attachment_inspect (GString *string, gconstpointer data, gpointer user_data)
   g_string_append_printf (string, "ctime=<%d>, ", attachment->ctime);
   g_string_append_printf (string, "checksum=<%s>", attachment->checksum->str);
   g_string_append (string, ">");
+}
+
+void
+test_no_attachment (void)
+{
+  document = load_document ("empty.pdf");
+  cut_assert_false (poppler_document_has_attachments (document));
 }
 
 void
