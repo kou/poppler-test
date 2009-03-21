@@ -342,10 +342,10 @@ dnl Cutter
 dnl
 if test x$enable_poppler_glib = xyes; then
   m4_ifdef([AC_CHECK_GCUTTER],
-           [AC_CHECK_GCUTTER(>= 1.0.5)],
+           [AC_CHECK_GCUTTER(>= 1.0.6)],
            [ac_cv_use_gcutter="no"])
   m4_ifdef([AC_CHECK_GDKCUTTER_PIXBUF],
-           [AC_CHECK_GDKCUTTER_PIXBUF(>= 1.0.5)],
+           [AC_CHECK_GDKCUTTER_PIXBUF(>= 1.0.6)],
            [ac_cv_use_gdkcutter_pixbuf="no"])
 
   if test "$ac_cv_use_gcutter" != "no"; then
