@@ -24,6 +24,7 @@
 
 void test_title (void);
 void test_visible (void);
+void test_nested (void);
 
 static PopplerDocument *document;
 
@@ -44,14 +45,11 @@ teardown (void)
     g_object_unref (document);
 }
 
-static const GList *
-load_layers (const gchar *fixture_data_component)
+static void
+load_document (const gchar *fixture_data_component)
 {
-  PopplerLayersIter *iter;
-  GList *layers = NULL;
-  PopplerLayer *layer;
-  GError *error = NULL;
   gchar *uri, *path;
+  GError *error = NULL;
 
   path = cut_build_fixture_data_path (fixture_data_component, NULL);
   uri = g_strconcat ("file://", path, NULL);
@@ -61,6 +59,16 @@ load_layers (const gchar *fixture_data_component)
   g_free (uri);
 
   gcut_assert_error (error);
+}
+
+static const GList *
+load_layers (const gchar *fixture_data_component)
+{
+  PopplerLayersIter *iter;
+  GList *layers = NULL;
+  PopplerLayer *layer;
+
+  load_document (fixture_data_component);
 
   iter = poppler_layers_iter_new (document);
   do {
@@ -118,4 +126,61 @@ test_visible (void)
                                                      NULL);
   gcut_assert_equal_list_string (expected_visibilities,
                                  gcut_take_list (visibilities, g_free));
+}
+
+static GList *
+collect_layer_titles (PopplerLayersIter *iter, const gchar *prefix)
+{
+  GList *titles = NULL;
+  gint i = 0;
+
+  if (!iter)
+    return NULL;
+
+  do {
+    PopplerLayersIter *child_iter;
+    gchar *title, *full_title;
+
+    title = poppler_layers_iter_get_title (iter);
+    if (!title)
+      title = g_strdup_printf ("(non title: %d)", i);
+    full_title = g_strdup_printf ("%s: %s", prefix, title);
+    titles = g_list_append (titles, full_title);
+    g_free (title);
+
+    child_iter = poppler_layers_iter_get_child (iter);
+    if (child_iter)
+      {
+        titles = g_list_concat (titles,
+                                collect_layer_titles (child_iter, full_title));
+        poppler_layers_iter_free (child_iter);
+      }
+    i++;
+  } while (poppler_layers_iter_next (iter));
+
+  return titles;
+}
+
+void
+test_nested (void)
+{
+  PopplerLayersIter *iter;
+  const GList *expected_titles;
+  GList *actual_titles;
+
+  load_document ("nested-layers.pdf");
+
+  iter = poppler_layers_iter_new (document);
+  actual_titles = collect_layer_titles (iter, "(top)");
+  poppler_layers_iter_free (iter);
+  gcut_take_list (actual_titles, g_free);
+
+  expected_titles =
+    gcut_take_new_list_string ("(top): (non title: 0)",
+                               "(top): (non title: 1)",
+                               "(top): (non title: 1): (non title: 0)",
+                               "(top): (non title: 2)",
+                               "(top): (non title: 3)",
+                               NULL);
+  gcut_assert_equal_list_string (expected_titles, actual_titles);
 }
