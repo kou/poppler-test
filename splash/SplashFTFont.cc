@@ -11,7 +11,7 @@
 // All changes made under the Poppler project to this file are licensed
 // under GPL version 2 or later
 //
-// Copyright (C) 2005, 2007-2008 Albert Astals Cid <aacid@kde.org>
+// Copyright (C) 2005, 2007-2009 Albert Astals Cid <aacid@kde.org>
 // Copyright (C) 2006 Kristian Høgsberg <krh@bitplanet.net>
 //
 // To see a description of the changes please see the Changelog file that
@@ -221,8 +221,8 @@ GBool SplashFTFont::makeGlyph(int c, int xFrac, int yFrac,
 
   *clipRes = clip->testRect(x0 - bitmap->x,
                             y0 - bitmap->y,
-                            x0 - bitmap->x + bitmap->w - 1,
-                            y0 - bitmap->y + bitmap->h - 1);
+                            x0 - bitmap->x + bitmap->w,
+                            y0 - bitmap->y + bitmap->h);
   if (*clipRes == splashClipAllOutside) {
     bitmap->freeData = gFalse;
     return gTrue;
@@ -243,7 +243,7 @@ GBool SplashFTFont::makeGlyph(int c, int xFrac, int yFrac,
   } else {
     rowSize = (bitmap->w + 7) >> 3;
   }
-  bitmap->data = (Guchar *)gmalloc(rowSize * bitmap->h);
+  bitmap->data = (Guchar *)gmallocn(rowSize, bitmap->h);
   bitmap->freeData = gTrue;
   for (i = 0, p = bitmap->data, q = slot->bitmap.buffer;
        i < bitmap->h;
@@ -273,6 +273,7 @@ double SplashFTFont::getGlyphAdvance(int c)
   offset.x = 0;
   offset.y = 0;
 
+  ff->face->size = sizeObj;
   FT_Set_Transform(ff->face, &identityMatrix, &offset);
 
   if (ff->codeToGID && c < ff->codeToGIDLen) {

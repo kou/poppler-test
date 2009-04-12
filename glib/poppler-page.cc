@@ -316,7 +316,7 @@ poppler_page_prepare_output_dev (PopplerPage *page,
 
   output_dev = page->document->output_dev;
   cairo_rowstride = cairo_width * 4;
-  cairo_data = (guchar *) gmalloc (cairo_height * cairo_rowstride);
+  cairo_data = (guchar *) gmallocn (cairo_height, cairo_rowstride);
   if (transparent)
       memset (cairo_data, 0x00, cairo_height * cairo_rowstride);
   else
@@ -522,6 +522,8 @@ poppler_page_set_selection_alpha (PopplerPage           *page,
 static GBool
 poppler_print_annot_cb (Annot *annot, void *user_data)
 {
+  if (annot->getFlags () & Annot::flagPrint)
+    return gTrue;
   return (annot->getType() == Annot::typeWidget);
 }
 

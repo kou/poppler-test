@@ -20,6 +20,7 @@
 // Copyright (C) 2008 Albert Astals Cid <aacid@kde.org>
 // Copyright (C) 2008 Pino Toscano <pino@kde.org>
 // Copyright (C) 2008 Hib Eris <hib@hiberis.nl>
+// Copyright (C) 2009 Ross Moore <ross@maths.mq.edu.au>
 //
 // To see a description of the changes please see the Changelog file that
 // came with your tarball or type make ChangeLog if you are building from git
@@ -4593,7 +4594,7 @@ void ActualText::endMC(GfxState *state) {
 	length = length/2 - 1;
       uni = new Unicode[length];
       for (i = 0 ; i < length; i++)
-	uni[i] = (uniString[2 + i*2]<<8) + uniString[2 + i*2+1];
+	uni[i] = ((uniString[2 + i*2] & 0xff)<<8)|(uniString[3 + i*2] & 0xff);
 
       text->addChar(state,
 		    actualText_x, actualText_y,

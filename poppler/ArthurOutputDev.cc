@@ -14,7 +14,7 @@
 // under GPL version 2 or later
 //
 // Copyright (C) 2005 Brad Hards <bradh@frogmouth.net>
-// Copyright (C) 2005-2008 Albert Astals Cid <aacid@kde.org>
+// Copyright (C) 2005-2009 Albert Astals Cid <aacid@kde.org>
 // Copyright (C) 2008 Pino Toscano <pino@kde.org>
 //
 // To see a description of the changes please see the Changelog file that
@@ -264,6 +264,7 @@ void ArthurOutputDev::updateFont(GfxState *state)
   SplashCoord mat[4];
   int substIdx, n;
   int faceIndex = 0;
+  SplashCoord matrix[6];
 
   m_needFontUpdate = false;
   m_font = NULL;
@@ -449,7 +450,6 @@ void ArthurOutputDev::updateFont(GfxState *state)
   m21 = textMat[2] * fontSize;
   m22 = textMat[3] * fontSize;
 
-  SplashCoord matrix[6];
   {
   QMatrix painterMatrix = m_painter->worldMatrix();
   matrix[0] = painterMatrix.m11();
@@ -751,7 +751,7 @@ void ArthurOutputDev::drawImage(GfxState *state, Object *ref, Stream *str,
   QMatrix matrix;
   int is_identity_transform;
   
-  buffer = (unsigned char *)gmalloc (width * height * 4);
+  buffer = (unsigned char *)gmallocn3(width, height, 4);
 
   /* TODO: Do we want to cache these? */
   imgStr = new ImageStream(str, width,
