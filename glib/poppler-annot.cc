@@ -1,6 +1,7 @@
 /* poppler-annot.cc: glib interface to poppler
  *
  * Copyright (C) 2007 Inigo Martinez <inigomartinez@gmail.com>
+ * Copyright (C) 2009 Carlos Garcia Campos <carlosgc@gnome.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -252,6 +253,31 @@ poppler_annot_get_contents (PopplerAnnot *poppler_annot)
 }
 
 /**
+ * poppler_annot_set_contents:
+ * @poppler_annot: a #PopplerAnnot
+ * @contents: a text string containing the new contents
+ *
+ * Sets the contents of @poppler_annot to the given value,
+ * replacing the current contents.
+ **/
+void
+poppler_annot_set_contents (PopplerAnnot *poppler_annot,
+			    const gchar  *contents)
+{
+  GooString *goo_tmp;
+  gchar *tmp;
+  gsize length = 0;
+  
+  g_return_if_fail (POPPLER_IS_ANNOT (poppler_annot));
+
+  tmp = contents ? g_convert (contents, -1, "UTF16BE", "UTF8", NULL, &length, NULL) : NULL;
+  goo_tmp = new GooString (tmp, length);
+  g_free (tmp);
+  poppler_annot->annot->setContents (goo_tmp);
+  delete (goo_tmp);
+}
+
+/**
  * poppler_annot_get_name:
  * @poppler_annot: a #PopplerAnnot
  *
@@ -276,7 +302,9 @@ poppler_annot_get_name (PopplerAnnot *poppler_annot)
  * poppler_annot_get_modified:
  * @poppler_annot: a #PopplerAnnot
  *
- * Retrieves the last modification data of @poppler_annot.
+ * Retrieves the last modification data of @poppler_annot. The returned
+ * string will be either a PDF format date or a text string.
+ * See also #poppler_date_parse()
  *
  * Return value: a new allocated string with the last modification data of
  *               @poppler_annot. It must be freed with g_free() when done.
@@ -428,22 +456,22 @@ poppler_annot_markup_get_date (PopplerAnnotMarkup *poppler_annot)
 {
   AnnotMarkup *annot;
   GooString *annot_date;
+  time_t timet;
 
   g_return_val_if_fail (POPPLER_IS_ANNOT_MARKUP (poppler_annot), NULL);
 
   annot = static_cast<AnnotMarkup *>(POPPLER_ANNOT (poppler_annot)->annot);
+  annot_date = annot->getDate ();
+  if (!annot_date)
+    return NULL;
 
-  if ((annot_date = annot->getDate ())) {
-    GDateYear year = g_ascii_digit_value (annot_date->getChar(2)) * 1000 +
-                     g_ascii_digit_value (annot_date->getChar(3)) * 100 +
-                     g_ascii_digit_value (annot_date->getChar(4)) * 10 +
-                     g_ascii_digit_value (annot_date->getChar(5));
-    GDateMonth month = (GDateMonth) (g_ascii_digit_value (annot_date->getChar(6)) * 10 +
-                                     g_ascii_digit_value (annot_date->getChar(7)));
-    GDateDay day = g_ascii_digit_value (annot_date->getChar(8)) * 10 +
-                   g_ascii_digit_value (annot_date->getChar(9));
+  if (_poppler_convert_pdf_date_to_gtime (annot_date, &timet)) {
+    GDate *date;
 
-    return g_date_new_dmy (day, month, year);
+    date = g_date_new ();
+    g_date_set_time_t (date, timet);
+
+    return date;
   }
 
   return NULL;

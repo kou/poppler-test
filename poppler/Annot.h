@@ -15,7 +15,7 @@
 //
 // Copyright (C) 2006 Scott Turner <scotty1024@mac.com>
 // Copyright (C) 2007, 2008 Julien Rebetez <julienr@svn.gnome.org>
-// Copyright (C) 2007, 2008 Carlos Garcia Campos <carlosgc@gnome.org>
+// Copyright (C) 2007-2009 Carlos Garcia Campos <carlosgc@gnome.org>
 // Copyright (C) 2007, 2008 Iñigo Martínez <inigomartinez@gmail.com>
 // Copyright (C) 2008 Michael Vrable <mvrable@cs.ucsd.edu>
 // Copyright (C) 2008 Hugo Mercier <hmercier31@gmail.com>
@@ -497,6 +497,10 @@ public:
 
   double getFontSize() { return fontSize; }
 
+  // Sets the annot contents to new_content
+  // new_content should never be NULL
+  void setContents(GooString *new_content);
+  
   // getters
   AnnotSubtype getType() const { return type; }
   PDFRectangle *getRect() const { return rect; }
@@ -525,6 +529,12 @@ protected:
   void drawCircle(double cx, double cy, double r, GBool fill);
   void drawCircleTopLeft(double cx, double cy, double r);
   void drawCircleBottomRight(double cx, double cy, double r);
+
+  // Updates the field key of the annotation dictionary
+  // and sets M to the current time
+  void update(const char *key, Object *value);
+
+  Object annotObj;
   
   // required data
   AnnotSubtype type;                // Annotation type
@@ -644,9 +654,6 @@ public:
   GBool getOpen() const { return open; }
   GooString *getIcon() const { return icon; }
   AnnotTextState getState() const { return state; }
-
-  // setters
-  void setModified(GooString *date);
 
 private:
 

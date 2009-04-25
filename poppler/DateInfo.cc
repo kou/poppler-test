@@ -3,6 +3,7 @@
 // DateInfo.cc
 //
 // Copyright (C) 2008 Albert Astals Cid <aacid@kde.org>
+// Copyright (C) 2009 Carlos Garcia Campos <carlosgc@gnome.org>
 //
 // To see a description of the changes please see the Changelog file that
 // came with your tarball or type make ChangeLog if you are building from git
@@ -16,6 +17,8 @@
 // Copyright 1998-2003 Glyph & Cog, LLC
 //
 //========================================================================
+
+#include <config.h>
 
 #include "DateInfo.h"
 
@@ -68,3 +71,48 @@ GBool parseDateString(const char *dateString, int *year, int *month, int *day, i
 
    return gFalse;
 }
+
+
+GooString *timeToDateString(time_t *timet) {
+  GooString *dateString;
+  char s[5];
+  struct tm *gt;
+  size_t len;
+  time_t timep = timet ? *timet : time(NULL);
+  
+#ifdef HAVE_GMTIME_R
+  struct tm t;
+  gt = gmtime_r (&timep, &t);
+#else
+  gt = gmtime (&timep);
+#endif
+
+  dateString = new GooString ("D:");
+
+  /* Year YYYY */
+  len = strftime (s, sizeof(s), "%Y", gt);
+  dateString->append (s, len);
+
+  /* Month MM */
+  len = strftime (s, sizeof(s), "%m", gt);
+  dateString->append (s, len);
+
+  /* Day DD */
+  len = strftime (s, sizeof(s), "%d", gt);
+  dateString->append (s, len);
+
+  /* Hour HH */
+  len = strftime (s, sizeof(s), "%H", gt);
+  dateString->append (s, len);
+
+  /* Minute mm */
+  len = strftime (s, sizeof(s), "%M", gt);
+  dateString->append (s, len);
+
+  /* Second SS */
+  len = strftime (s, sizeof(s), "%S", gt);
+  dateString->append (s, len);
+
+  return dateString;
+}
+

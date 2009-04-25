@@ -16,7 +16,7 @@
 // Copyright (C) 2006 Scott Turner <scotty1024@mac.com>
 // Copyright (C) 2007, 2008 Julien Rebetez <julienr@svn.gnome.org>
 // Copyright (C) 2007-2009 Albert Astals Cid <aacid@kde.org>
-// Copyright (C) 2007, 2008 Carlos Garcia Campos <carlosgc@gnome.org>
+// Copyright (C) 2007-2009 Carlos Garcia Campos <carlosgc@gnome.org>
 // Copyright (C) 2007, 2008 Iñigo Martínez <inigomartinez@gmail.com>
 // Copyright (C) 2007 Jeff Muizelaar <jeff@infidigm.net>
 // Copyright (C) 2008 Pino Toscano <pino@kde.org>
@@ -56,6 +56,7 @@
 #include "OptionalContent.h"
 #include "Sound.h"
 #include "FileSpec.h"
+#include "DateInfo.h"
 #include <string.h>
 
 #define annotFlagHidden    0x0002
@@ -841,6 +842,7 @@ void Annot::initialize(XRef *xrefA, Dict *dict, Catalog *catalog) {
   xref = xrefA;
   appearBuf = NULL;
   fontSize = 0;
+  annotObj.initDict (dict);
 
   //----- parse the rectangle
   rect = new PDFRectangle();
@@ -984,6 +986,39 @@ void Annot::initialize(XRef *xrefA, Dict *dict, Catalog *catalog) {
   }
 }
 
+void Annot::update(const char *key, Object *value) {
+  /* Set M to current time */
+  delete modified;
+  modified = timeToDateString(NULL);
+
+  Object obj1;
+  obj1.initString (modified->copy());
+  annotObj.dictSet("M", &obj1);
+
+  annotObj.dictSet(const_cast<char*>(key), value);
+  
+  xref->setModifiedObject(&annotObj, ref);
+}
+
+void Annot::setContents(GooString *new_content) {
+  delete contents;
+
+  if (new_content) {
+    contents = new GooString(new_content);
+    //append the unicode marker <FE FF> if needed	
+    if (!contents->hasUnicodeMarker()) {
+      contents->insert(0, 0xff);
+      contents->insert(0, 0xfe);
+    }
+  } else {
+    contents = new GooString();
+  }
+  
+  Object obj1;
+  obj1.initString(contents->copy());
+  update ("Contents", &obj1);
+}
+	
 double Annot::getXMin() {
   return rect->x1;
 }
@@ -1006,8 +1041,10 @@ void Annot::readArrayNum(Object *pdfArray, int key, double *value) {
 }
 
 Annot::~Annot() {
+  annotObj.free();
+  
   delete rect;
-
+  
   if (contents)
     delete contents;
 
@@ -1321,13 +1358,6 @@ AnnotText::AnnotText(XRef *xrefA, Dict *dict, Catalog *catalog, Object *obj) :
 
 AnnotText::~AnnotText() {
   delete icon;
-}
-
-void AnnotText::setModified(GooString *date) {
-  if (date) {
-    delete modified;
-    modified = new GooString(date);
-  }
 }
 
 void AnnotText::initialize(XRef *xrefA, Catalog *catalog, Dict *dict) {

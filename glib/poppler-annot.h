@@ -1,6 +1,7 @@
 /* poppler-annot.h: glib interface to poppler
  *
  * Copyright (C) 2007 Inigo Martinez <inigomartinez@gmail.com>
+ * Copyright (C) 2009 Carlos Garcia Campos <carlosgc@gnome.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -133,6 +134,8 @@ struct _PopplerAnnotCalloutLine
 GType                         poppler_annot_get_type                           (void) G_GNUC_CONST;
 PopplerAnnotType              poppler_annot_get_annot_type                     (PopplerAnnot *poppler_annot);
 gchar                        *poppler_annot_get_contents                       (PopplerAnnot *poppler_annot);
+void                          poppler_annot_set_contents                       (PopplerAnnot *poppler_annot,
+										const gchar  *contents);
 gchar                        *poppler_annot_get_name                           (PopplerAnnot *poppler_annot);
 gchar                        *poppler_annot_get_modified                       (PopplerAnnot *poppler_annot);
 PopplerAnnotFlag              poppler_annot_get_flags                          (PopplerAnnot *poppler_annot);
