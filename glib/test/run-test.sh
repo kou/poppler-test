@@ -18,6 +18,10 @@ if test x"$CUTTER_DEBUG" = x"yes"; then
     CUTTER_ARGS="--keep-opening-modules"
 fi
 
+if test x"$CUTTER_VERBOSE" != x"no"; then
+    CUTTER_ARGS="$CUTTER_ARGS --verbose=verbose"
+fi
+
 export CUTTER
 
 CUTTER_ARGS="$CUTTER_ARGS -s $BASE_DIR"
