@@ -14,6 +14,9 @@ fi
 CUTTER_WRAPPER=
 CUTTER_ARGS=
 if test x"$CUTTER_DEBUG" = x"yes"; then
+    G_DEBUG=fatal_warnings
+    export G_DEBUG
+
     CUTTER_WRAPPER="$top_dir/libtool --mode=execute gdb --args"
     CUTTER_ARGS="--keep-opening-modules"
 fi
