@@ -534,7 +534,7 @@ test_no_attachment (void)
 void
 test_attachment (void)
 {
-  GList *expected, *actual;
+  GList *expected = NULL, *actual;
 
   document = load_document ("attachment.pdf");
   cut_assert_true (poppler_document_has_attachments (document));
