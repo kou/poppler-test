@@ -36,7 +36,7 @@ void test_attachment (void);
 void test_attachment_save (void);
 
 static PopplerDocument *document;
-static GList *attachments;
+static GList *expected_attachments;
 static GList *expected_font_names, *actual_font_names;
 static GList *expected_action_types, *actual_action_types;
 
@@ -48,7 +48,7 @@ setup (void)
 {
   document = NULL;
 
-  attachments = NULL;
+  expected_attachments = NULL;
 
   expected_font_names = NULL;
   actual_font_names = NULL;
@@ -71,10 +71,10 @@ setup (void)
 void
 teardown (void)
 {
-  if (attachments)
+  if (expected_attachments)
     {
-      g_list_foreach (attachments, (GFunc) g_object_unref, NULL);
-      g_list_free (attachments);
+      g_list_foreach (expected_attachments, (GFunc) g_object_unref, NULL);
+      g_list_free (expected_attachments);
     }
 
   if (document)
@@ -543,31 +543,24 @@ test_no_attachment (void)
 void
 test_attachment (void)
 {
-  GList *attachments, *node;
-  GList *expected = NULL, *actual = NULL;
+  GList *actual_attachments;
 
   document = load_document ("attachment.pdf");
   cut_assert_true (poppler_document_has_attachments (document));
 
-  expected = g_list_append (expected,
-                            attachment_new ("hello.html", "hello.html", 300,
+  expected_attachments =
+    g_list_append (expected_attachments,
+                   attachment_new ("hello.html", "hello.html", 300,
                                             0, 0, NULL));
-  expected = g_list_append (expected,
-                            attachment_new ("hello.txt", "hello.txt", 13,
-                                            0, 0, NULL));
+  expected_attachments =
+    g_list_append (expected_attachments,
+                   attachment_new ("hello.txt", "hello.txt", 13,
+                                   0, 0, NULL));
 
-  attachments = poppler_document_get_attachments (document);
-  for (node = attachments; node; node = g_list_next (node))
-    {
-      PopplerAttachment *attachment = node->data;
-
-      actual = g_list_append (actual, g_object_ref (attachment));
-    }
-
-  gcut_take_list (expected, g_object_unref);
-  gcut_take_list (actual, g_object_unref);
-  gcut_assert_equal_list (expected,
-                          actual,
+  actual_attachments = poppler_document_get_attachments (document);
+  gcut_take_list (actual_attachments, g_object_unref);
+  gcut_assert_equal_list (expected_attachments,
+                          actual_attachments,
                           attachment_equal,
                           attachment_inspect,
                           NULL);
@@ -582,6 +575,7 @@ test_attachment_save (void)
   cut_assert_true (poppler_document_has_attachments (document));
 
   attachments = poppler_document_get_attachments (document);
+  gcut_take_list (attachments, g_object_unref);
   for (node = attachments; node; node = g_list_next (node))
     {
       PopplerAttachment *attachment = node->data;
