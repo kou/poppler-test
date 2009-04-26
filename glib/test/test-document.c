@@ -36,7 +36,6 @@ void test_attachment (void);
 void test_attachment_save (void);
 
 static PopplerDocument *document;
-static GList *expected_attachments;
 static GList *expected_font_names, *actual_font_names;
 static GList *expected_action_types, *actual_action_types;
 
@@ -47,8 +46,6 @@ void
 setup (void)
 {
   document = NULL;
-
-  expected_attachments = NULL;
 
   expected_font_names = NULL;
   actual_font_names = NULL;
@@ -71,12 +68,6 @@ setup (void)
 void
 teardown (void)
 {
-  if (expected_attachments)
-    {
-      g_list_foreach (expected_attachments, (GFunc) g_object_unref, NULL);
-      g_list_free (expected_attachments);
-    }
-
   if (document)
     g_object_unref (document);
 
@@ -543,24 +534,23 @@ test_no_attachment (void)
 void
 test_attachment (void)
 {
-  GList *actual_attachments;
+  GList *expected, *actual;
 
   document = load_document ("attachment.pdf");
   cut_assert_true (poppler_document_has_attachments (document));
 
-  expected_attachments =
-    g_list_append (expected_attachments,
-                   attachment_new ("hello.html", "hello.html", 300,
+  expected = g_list_append (expected,
+                            attachment_new ("hello.html", "hello.html", 300,
                                             0, 0, NULL));
-  expected_attachments =
-    g_list_append (expected_attachments,
-                   attachment_new ("hello.txt", "hello.txt", 13,
-                                   0, 0, NULL));
+  expected = g_list_append (expected,
+                            attachment_new ("hello.txt", "hello.txt", 13,
+                                            0, 0, NULL));
 
-  actual_attachments = poppler_document_get_attachments (document);
-  gcut_take_list (actual_attachments, g_object_unref);
-  gcut_assert_equal_list (expected_attachments,
-                          actual_attachments,
+  actual = poppler_document_get_attachments (document);
+  gcut_take_list (expected, g_object_unref);
+  gcut_take_list (actual, g_object_unref);
+  gcut_assert_equal_list (expected,
+                          actual,
                           attachment_equal,
                           attachment_inspect,
                           NULL);
