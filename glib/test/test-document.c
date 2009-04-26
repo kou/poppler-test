@@ -488,7 +488,10 @@ attachment_new (const gchar *name, const gchar *description,
   attachment->size = size;
   attachment->mtime = mtime;
   attachment->ctime = ctime;
-  attachment->checksum = g_string_new_len (checksum, strlen (checksum));
+  if (checksum)
+    attachment->checksum = g_string_new_len (checksum, strlen (checksum));
+  else
+    attachment->checksum = NULL;
 }
 
 static gboolean
@@ -497,13 +500,18 @@ attachment_equal (gconstpointer data1, gconstpointer data2)
   const PopplerAttachment *attachment1 = data1;
   const PopplerAttachment *attachment2 = data2;
 
+  if ((attachment1->checksum != attachment2->checksum) &&
+      (attachment1->checksum == NULL || attachment2->checksum == NULL))
+    return FALSE;
+
   return
     cut_equal_string (attachment1->name, attachment2->name) &&
     cut_equal_string (attachment1->description, attachment2->description) &&
     attachment1->size == attachment2->size &&
     attachment1->mtime == attachment2->mtime &&
     attachment1->ctime == attachment2->ctime &&
-    cut_equal_string (attachment1->checksum->str, attachment2->checksum->str);
+    (attachment1->checksum == attachment2->checksum ||
+     cut_equal_string (attachment1->checksum->str, attachment2->checksum->str));
 }
 
 static void
@@ -518,7 +526,10 @@ attachment_inspect (GString *string, gconstpointer data, gpointer user_data)
                           attachment->size);
   g_string_append_printf (string, "mtime=<%d>, ", attachment->mtime);
   g_string_append_printf (string, "ctime=<%d>, ", attachment->ctime);
-  g_string_append_printf (string, "checksum=<%s>", attachment->checksum->str);
+  if (attachment->checksum)
+    g_string_append_printf (string, "checksum=<%s>", attachment->checksum->str);
+  else
+    g_string_append (string, "checksum=<NULL>");
   g_string_append (string, ">");
 }
 
@@ -540,10 +551,10 @@ test_attachment (void)
 
   expected = g_list_append (expected,
                             attachment_new ("hello.html", "hello.html", 300,
-                                            0, 0, ""));
+                                            0, 0, NULL));
   expected = g_list_append (expected,
                             attachment_new ("hello.txt", "hello.txt", 13,
-                                            0, 0, ""));
+                                            0, 0, NULL));
 
   attachments = poppler_document_get_attachments (document);
   for (node = attachments; node; node = g_list_next (node))
