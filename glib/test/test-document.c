@@ -491,6 +491,12 @@ attachment_equal (gconstpointer data1, gconstpointer data2)
   const PopplerAttachment *attachment1 = data1;
   const PopplerAttachment *attachment2 = data2;
 
+  if (attachment1 == attachment2)
+    return TRUE;
+
+  if (attachment1 == NULL || attachment2 == NULL)
+    return FALSE;
+
   if ((attachment1->checksum != attachment2->checksum) &&
       (attachment1->checksum == NULL || attachment2->checksum == NULL))
     return FALSE;
