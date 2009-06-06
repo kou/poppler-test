@@ -9,7 +9,7 @@ cairo_libs =					\
 
 endif
 
-SUBDIRS = . reference demo
+SUBDIRS = . reference demo test
 INCLUDES =					\
 	-DG_LOG_DOMAIN=\"Poppler\"		\
 	-I$(top_srcdir)				\

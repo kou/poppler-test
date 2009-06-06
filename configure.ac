@@ -343,6 +343,31 @@ AC_SUBST(GDK_FEATURE)
 AC_SUBST(POPPLER_GLIB_DISABLE_DEPRECATED)
 AC_SUBST(POPPLER_GLIB_DISABLE_SINGLE_INCLUDES)
 
+dnl
+dnl Cutter
+dnl
+if test x$enable_poppler_glib = xyes; then
+  m4_ifdef([AC_CHECK_GCUTTER],
+           [AC_CHECK_GCUTTER(>= 1.0.6)],
+           [ac_cv_use_gcutter="no"])
+  m4_ifdef([AC_CHECK_GDKCUTTER_PIXBUF],
+           [AC_CHECK_GDKCUTTER_PIXBUF(>= 1.0.6)],
+           [ac_cv_use_gdkcutter_pixbuf="no"])
+
+  if test "$ac_cv_use_gcutter" != "no"; then
+    enable_cutter="yes"
+  else
+    enable_cutter="no"
+  fi
+  AM_CONDITIONAL([WITH_CUTTER], [test "$enable_cutter" == "yes"])
+  AM_CONDITIONAL([WITH_GDKCUTTER_PIXBUF],
+                 [test "$ac_cv_use_gdkcutter_pixbuf" != "no"])
+  if test "$enable_cutter" == "yes"; then
+    AC_DEFINE(WITH_CUTTER, 1, [Define to 1 if you use Cutter])
+  fi
+fi
+
+
 AC_ARG_ENABLE(poppler-qt,
 	      AC_HELP_STRING([--disable-poppler-qt],
 			     [Don't compile poppler qt wrapper.]),
@@ -516,6 +541,10 @@ glib/Makefile
 glib/poppler-features.h
 glib/reference/Makefile
 glib/demo/Makefile
+glib/test/Makefile
+glib/test/lib/Makefile
+glib/test/fixtures/Makefile
+glib/test/fixtures/pdf/Makefile
 test/Makefile
 qt/Makefile
 qt4/Makefile
@@ -546,6 +575,7 @@ echo "  use zlib:           $enable_zlib"
 echo "  use libopenjpeg:    $enable_libopenjpeg"
 echo "  use cms:            $enable_cms"
 echo "  command line utils: $enable_utils"
+echo "  use cutter:         $enable_cutter"
 echo ""
 
 if test x$enable_splash_output = xno -a x$enable_cairo_output = xno; then
