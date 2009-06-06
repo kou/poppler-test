@@ -1,5 +1,6 @@
-/* poppler-features.h: glib interface to poppler
- * Copyright (C) 2006, Red Hat, Inc.
+/*
+ * Copyright (C) 2009, Shawn Rutledge <shawn.t.rutledge@gmail.com>
+ * Copyright (C) 2009, Pino Toscano <pino@kde.org>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,18 +17,32 @@
  * Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-#ifndef __POPPLER_FEATURES_H__
-#define __POPPLER_FEATURES_H__
+#ifndef THUMBNAILS_H
+#define THUMBNAILS_H
 
-@CAIRO_FEATURE@
+#include "abstractinfodock.h"
 
-#define POPPLER_MAJOR_VERSION (@POPPLER_MAJOR_VERSION@)
-#define POPPLER_MINOR_VERSION (@POPPLER_MINOR_VERSION@)
-#define POPPLER_MICRO_VERSION (@POPPLER_MICRO_VERSION@)
+class QListWidget;
+class QListWidgetItem;
 
-#define POPPLER_CHECK_VERSION(major,minor,micro) \
-  (POPPLER_MAJOR_VERSION > (major) || \
-   (POPPLER_MAJOR_VERSION == (major) && POPPLER_MINOR_VERSION > (minor)) || \
-   (POPPLER_MAJOR_VERSION == (major) && POPPLER_MINOR_VERSION == (minor) && POPPLER_MICRO_VERSION >= (micro)))
+class ThumbnailsDock : public AbstractInfoDock
+{
+    Q_OBJECT
 
-#endif /* __POPPLER_FEATURES_H__ */
+public:
+    ThumbnailsDock(QWidget *parent = 0);
+    ~ThumbnailsDock();
+
+    /*virtual*/ void documentClosed();
+
+protected:
+    /*virtual*/ void fillInfo();
+
+private Q_SLOTS:
+    void slotItemActivated(QListWidgetItem *item);
+
+private:
+    QListWidget *m_list;
+};
+
+#endif

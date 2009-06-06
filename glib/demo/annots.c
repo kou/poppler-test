@@ -152,28 +152,25 @@ get_annot_color (PopplerAnnot *poppler_annot)
 
     if ((poppler_color = poppler_annot_get_color (poppler_annot))) {
         GdkPixbuf *pixbuf;
+	gint rowstride, num, x;
+	guchar *pixels;
 
         pixbuf = gdk_pixbuf_new (GDK_COLORSPACE_RGB,
                                  FALSE, 8,
                                  64, 16);
 
-        if (pixbuf) {
-            gint rowstride, num, x;
-            guchar *pixels;
-
-            rowstride = gdk_pixbuf_get_rowstride (pixbuf);
-            pixels = gdk_pixbuf_get_pixels (pixbuf);
+	rowstride = gdk_pixbuf_get_rowstride (pixbuf);
+	pixels = gdk_pixbuf_get_pixels (pixbuf);
             
-            num = gdk_pixbuf_get_width (pixbuf) *
+	num = gdk_pixbuf_get_width (pixbuf) *
                 gdk_pixbuf_get_height (pixbuf);
 
-            for (x = 0; x < num; x++) {
-                pixels[0] = poppler_color->red * 255;
-                pixels[1] = poppler_color->green * 255;
-                pixels[2] = poppler_color->blue * 255;
-                pixels += 3;
-            }
-        }
+	for (x = 0; x < num; x++) {
+          pixels[0] = poppler_color->red;
+	  pixels[1] = poppler_color->green;
+	  pixels[2] = poppler_color->blue;
+	  pixels += 3;
+	}
 
         g_free (poppler_color);
 
@@ -306,13 +303,22 @@ pgd_annot_view_set_annot_markup (GtkWidget          *table,
                                  gint               *row)
 {
     gchar *text;
+    PopplerRectangle rect;
 
     text = poppler_annot_markup_get_label (markup);
     pgd_table_add_property (GTK_TABLE (table), "<b>Label:</b>", text, row);
     g_free (text);
 
-    pgd_table_add_property (GTK_TABLE (table), "<b>Popup is open:</b>",
-                            poppler_annot_markup_get_popup_is_open (markup) ? "Yes" : "No", row);
+    if (poppler_annot_markup_has_popup (markup)) {
+	    pgd_table_add_property (GTK_TABLE (table), "<b>Popup is open:</b>",
+				    poppler_annot_markup_get_popup_is_open (markup) ? "Yes" : "No", row);
+
+	    poppler_annot_markup_get_popup_rectangle (markup, &rect);
+	    text = g_strdup_printf ("X1: %.2f, Y1: %.2f, X2: %.2f, Y2: %.2f",
+				    rect.x1, rect.y1, rect.x2, rect.y2);
+	    pgd_table_add_property (GTK_TABLE (table), "<b>Popup Rectangle:</b>", text, row);
+	    g_free (text);
+    }
 
     text = g_strdup_printf ("%f", poppler_annot_markup_get_opacity (markup));
     pgd_table_add_property (GTK_TABLE (table), "<b>Opacity:</b>", text, row);

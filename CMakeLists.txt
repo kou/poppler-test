@@ -11,7 +11,10 @@ find_package(PkgConfig)
 include(MacroEnsureVersion)
 include(MacroBoolTo01)
 
-set(POPPLER_VERSION "0.10.0")
+set(POPPLER_MAJOR_VERSION "0")
+set(POPPLER_MINOR_VERSION "11")
+set(POPPLER_MICRO_VERSION "0")
+set(POPPLER_VERSION "${POPPLER_MAJOR_VERSION}.${POPPLER_MINOR_VERSION}.${POPPLER_MICRO_VERSION}")
 
 # command line switches
 option(ENABLE_XPDF_HEADERS "Install unsupported xpdf headers." OFF)
@@ -106,6 +109,9 @@ endif(ENABLE_ABIWORD)
 if(LIBOPENJPEG_FOUND)
   include_directories(${LIBOPENJPEG_INCLUDE_DIR})
 endif(LIBOPENJPEG_FOUND)
+if(LCMS_FOUND)
+  include_directories(${LCMS_INCLUDE_DIR})
+endif(LCMS_FOUND)
 
 if(DEFINED COMPILE_WARNINGS)
 else(DEFINED COMPILE_WARNINGS)
@@ -258,7 +264,7 @@ add_library(poppler STATIC ${poppler_SRCS})
 else(MSVC)
 add_library(poppler SHARED ${poppler_SRCS})
 endif(MSVC)
-set_target_properties(poppler PROPERTIES VERSION 4.0.0 SOVERSION 4)
+set_target_properties(poppler PROPERTIES VERSION 5.0.0 SOVERSION 5)
 target_link_libraries(poppler ${poppler_LIBS})
 install(TARGETS poppler RUNTIME DESTINATION bin LIBRARY DESTINATION lib ARCHIVE DESTINATION lib)
 
@@ -284,6 +290,7 @@ if(ENABLE_XPDF_HEADERS)
     poppler/Gfx.h
     poppler/GfxFont.h
     poppler/GfxState.h
+    poppler/GfxState_helpers.h
     poppler/GlobalParams.h
     poppler/JArithmeticDecoder.h
     poppler/JBIG2Stream.h

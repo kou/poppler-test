@@ -18,6 +18,7 @@
 // Copyright (C) 2006 Carlos Garcia Campos <carlosgc@gnome.org>
 // Copyright (C) 2006-2009 Albert Astals Cid <aacid@kde.org>
 // Copyright (C) 2009 Koji Otani <sho@bbr.jp>
+// Copyright (C) 2009 Thomas Freitag <Thomas.Freitag@alfa.de>
 //
 // To see a description of the changes please see the Changelog file that
 // came with your tarball or type make ChangeLog if you are building from git
@@ -39,18 +40,11 @@
 #include "Array.h"
 #include "Page.h"
 #include "GfxState.h"
+#include "GfxState_helpers.h"
 #include "GfxFont.h"
 #include "GlobalParams.h"
 
 //------------------------------------------------------------------------
-
-static inline GfxColorComp clip01(GfxColorComp x) {
-  return (x < 0) ? 0 : (x > gfxColorComp1) ? gfxColorComp1 : x;
-}
-
-static inline double clip01(double x) {
-  return (x < 0) ? 0 : (x > 1) ? 1 : x;
-}
 
 GBool Matrix::invertTo(Matrix *other)
 {
@@ -127,6 +121,64 @@ static char *gfxColorSpaceModeNames[] = {
 };
 
 #define nGfxColorSpaceModes ((sizeof(gfxColorSpaceModeNames) / sizeof(char *)))
+
+#ifdef USE_CMS
+
+#include <lcms.h>
+
+#define COLOR_PROFILE_DIR "/ColorProfiles/"
+#define GLOBAL_COLOR_PROFILE_DIR POPPLER_DATADIR COLOR_PROFILE_DIR
+
+void GfxColorTransform::doTransform(void *in, void *out, unsigned int size) {
+  cmsDoTransform(transform, in, out, size);
+}
+
+// transformA should be a cmsHTRANSFORM
+GfxColorTransform::GfxColorTransform(void *transformA) {
+  transform = transformA;
+  refCount = 1;
+}
+
+GfxColorTransform::~GfxColorTransform() {
+  cmsDeleteTransform(transform);
+}
+
+void GfxColorTransform::ref() {
+  refCount++;
+}
+
+unsigned int GfxColorTransform::unref() {
+  return --refCount;
+}
+
+static cmsHPROFILE RGBProfile = NULL;
+static GooString *displayProfileName = NULL; // display profile file Name
+static cmsHPROFILE displayProfile = NULL; // display profile
+static unsigned int displayPixelType = 0;
+static GfxColorTransform *XYZ2DisplayTransform = NULL;
+
+// convert color space signature to cmsColor type 
+static unsigned int getCMSColorSpaceType(icColorSpaceSignature cs);
+static unsigned int getCMSNChannels(icColorSpaceSignature cs);
+static cmsHPROFILE loadColorProfile(const char *fileName);
+
+void GfxColorSpace::setDisplayProfile(void *displayProfileA) {
+  displayProfile = displayProfileA;
+}
+
+void GfxColorSpace::setDisplayProfileName(GooString *name) {
+  displayProfileName = name->copy();
+}
+
+cmsHPROFILE GfxColorSpace::getRGBProfile() {
+  return RGBProfile;
+}
+
+cmsHPROFILE GfxColorSpace::getDisplayProfile() {
+  return displayProfile;
+}
+
+#endif
 
 //------------------------------------------------------------------------
 // GfxColorSpace
@@ -227,13 +279,7 @@ void GfxColorSpace::getRGBLine(Guchar *in, unsigned int *out, int length) {
 }
 
 #ifdef USE_CMS
-cmsHPROFILE GfxColorSpace::RGBProfile = NULL;
-cmsHPROFILE GfxColorSpace::displayProfile = NULL;
-GooString *GfxColorSpace::displayProfileName = NULL;
-unsigned int GfxColorSpace::displayPixelType = 0;
-GfxColorTransform *GfxColorSpace::XYZ2DisplayTransform = NULL;
-
-cmsHPROFILE GfxColorSpace::loadColorProfile(const char *fileName)
+cmsHPROFILE loadColorProfile(const char *fileName)
 {
   cmsHPROFILE hp = NULL;
   FILE *fp;
@@ -324,7 +370,7 @@ int GfxColorSpace::setupColorProfiles()
   return 0;
 }
 
-unsigned int GfxColorSpace::getCMSColorSpaceType(icColorSpaceSignature cs)
+unsigned int getCMSColorSpaceType(icColorSpaceSignature cs)
 {
     switch (cs) {
     case icSigXYZData:
@@ -380,7 +426,7 @@ unsigned int GfxColorSpace::getCMSColorSpaceType(icColorSpaceSignature cs)
     return PT_RGB;
 }
 
-unsigned int GfxColorSpace::getCMSNChannels(icColorSpaceSignature cs)
+unsigned int getCMSNChannels(icColorSpaceSignature cs)
 {
     switch (cs) {
     case icSigXYZData:
@@ -1024,7 +1070,7 @@ void GfxDeviceCMYKColorSpace::getGray(GfxColor *color, GfxGray *gray) {
 }
 
 void GfxDeviceCMYKColorSpace::getRGB(GfxColor *color, GfxRGB *rgb) {
-  double c, m, y, k, c1, m1, y1, k1, r, g, b, x;
+  double c, m, y, k, c1, m1, y1, k1, r, g, b;
     
   c = colToDbl(color->c[0]);
   m = colToDbl(color->c[1]);
@@ -1034,52 +1080,7 @@ void GfxDeviceCMYKColorSpace::getRGB(GfxColor *color, GfxRGB *rgb) {
   m1 = 1 - m;
   y1 = 1 - y;
   k1 = 1 - k;
-  // this is a matrix multiplication, unrolled for performance
-  //                        C M Y K
-  x = c1 * m1 * y1 * k1; // 0 0 0 0
-  r = g = b = x;
-  x = c1 * m1 * y1 * k;  // 0 0 0 1
-  r += 0.1373 * x;
-  g += 0.1216 * x;
-  b += 0.1255 * x;
-  x = c1 * m1 * y  * k1; // 0 0 1 0
-  r += x;
-  g += 0.9490 * x;
-  x = c1 * m1 * y  * k;  // 0 0 1 1
-  r += 0.1098 * x;
-  g += 0.1020 * x;
-  x = c1 * m  * y1 * k1; // 0 1 0 0
-  r += 0.9255 * x;
-  b += 0.5490 * x;
-  x = c1 * m  * y1 * k;  // 0 1 0 1
-  r += 0.1412 * x;
-  x = c1 * m  * y  * k1; // 0 1 1 0
-  r += 0.9294 * x;
-  g += 0.1098 * x;
-  b += 0.1412 * x;
-  x = c1 * m  * y  * k;  // 0 1 1 1
-  r += 0.1333 * x;
-  x = c  * m1 * y1 * k1; // 1 0 0 0
-  g += 0.6784 * x;
-  b += 0.9373 * x;
-  x = c  * m1 * y1 * k;  // 1 0 0 1
-  g += 0.0588 * x;
-  b += 0.1412 * x;
-  x = c  * m1 * y  * k1; // 1 0 1 0
-  g += 0.6510 * x;
-  b += 0.3137 * x;
-  x = c  * m1 * y  * k;  // 1 0 1 1
-  g += 0.0745 * x;
-  x = c  * m  * y1 * k1; // 1 1 0 0
-  r += 0.1804 * x;
-  g += 0.1922 * x;
-  b += 0.5725 * x;
-  x = c  * m  * y1 * k;  // 1 1 0 1
-  b += 0.0078 * x;
-  x = c  * m  * y  * k1; // 1 1 1 0
-  r += 0.2118 * x;
-  g += 0.2119 * x;
-  b += 0.2235 * x;
+  cmykToRGBMatrixMultiplication(c, m, y, k, c1, m1, y1, k1, r, g, b);
   rgb->r = clip01(dblToCol(r));
   rgb->g = clip01(dblToCol(g));
   rgb->b = clip01(dblToCol(b));
@@ -1508,16 +1509,20 @@ GfxColorSpace *GfxICCBasedColorSpace::parse(Array *arr) {
 	     CHANNELS_SH(dNChannels) | BYTES_SH(1),
 	  INTENT_RELATIVE_COLORIMETRIC,0)) == 0) {
       error(-1, "Can't create transform");
+      cs->transform = NULL;
+    } else {
+      cs->transform = new GfxColorTransform(transform);
     }
-    cs->transform = new GfxColorTransform(transform);
     if (dcst == PT_RGB) {
        // create line transform only when the display is RGB type color space 
       if ((transform = cmsCreateTransform(hp,
 	    CHANNELS_SH(nCompsA) | BYTES_SH(1),dhp,
 	    TYPE_RGB_8,INTENT_RELATIVE_COLORIMETRIC,0)) == 0) {
 	error(-1, "Can't create transform");
+	cs->lineTransform = NULL;
+      } else {
+	cs->lineTransform = new GfxColorTransform(transform);
       }
-      cs->lineTransform = new GfxColorTransform(transform);
     }
     cmsCloseProfile(hp);
   }
@@ -3300,9 +3305,11 @@ GfxGouraudTriangleShading *GfxGouraudTriangleShading::parse(int typeA,
       break;
     }
     if (nVerticesA == vertSize) {
+      int oldVertSize = vertSize;
       vertSize = (vertSize == 0) ? 16 : 2 * vertSize;
       verticesA = (GfxGouraudVertex *)
 	              greallocn(verticesA, vertSize, sizeof(GfxGouraudVertex));
+      memset(verticesA + oldVertSize, 0, (vertSize - oldVertSize) * sizeof(GfxGouraudVertex));
     }
     verticesA[nVerticesA].x = xMin + xMul * (double)x;
     verticesA[nVerticesA].y = yMin + yMul * (double)y;
@@ -3622,9 +3629,11 @@ GfxPatchMeshShading *GfxPatchMeshShading::parse(int typeA, Dict *dict,
       break;
     }
     if (nPatchesA == patchesSize) {
+      int oldPatchesSize = patchesSize;
       patchesSize = (patchesSize == 0) ? 16 : 2 * patchesSize;
       patchesA = (GfxPatch *)greallocn(patchesA,
 				       patchesSize, sizeof(GfxPatch));
+      memset(patchesA + oldPatchesSize, 0, (patchesSize - oldPatchesSize) * sizeof(GfxPatch));
     }
     p = &patchesA[nPatchesA];
     if (typeA == 6) {

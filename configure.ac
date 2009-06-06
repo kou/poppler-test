@@ -1,5 +1,10 @@
+m4_define([poppler_version_major],[0])
+m4_define([poppler_version_minor],[11])
+m4_define([poppler_version_micro],[0])
+m4_define([poppler_version],[poppler_version_major.poppler_version_minor.poppler_version_micro])
+
 AC_PREREQ(2.59)
-AC_INIT(poppler, 0.10.0)
+AC_INIT([poppler],[poppler_version],[https://bugs.freedesktop.org/enter_bug.cgi?product=poppler])
 AC_CONFIG_MACRO_DIR([m4])
 AM_INIT_AUTOMAKE([foreign])
 AM_CONFIG_HEADER(config.h)
@@ -291,7 +296,7 @@ if test x$enable_poppler_glib = xyes; then
 fi
 AM_CONDITIONAL(BUILD_POPPLER_GLIB, test x$enable_poppler_glib = xyes)
 
-GTK_DOC_CHECK([1.0])
+m4_ifdef([GTK_DOC_CHECK],[GTK_DOC_CHECK([1.0])])
 
 dnl
 dnl GDK
@@ -483,12 +488,14 @@ AC_ARG_ENABLE(cms,
 	      AC_HELP_STRING([--disable-cms],
 	                     [Don't use color management system.]),
               enable_cms=$enableval,
-              enable_cms="yes")
+              enable_cms="try")
 if test x$enable_cms = xyes; then
-  AC_CHECK_LIB([lcms],cmsOpenProfileFromFile,,
-	       AC_MSG_ERROR("*** lcms library not found ***"))
-  AC_CHECK_HEADERS([lcms.h],,
-		   AC_MSG_ERROR("*** lcms headers not found ***"))
+  PKG_CHECK_MODULES(LCMS, lcms)
+elif test x$enable_cms = xtry; then
+  PKG_CHECK_MODULES(LCMS, lcms, [enable_cms=yes], [enable_cms=no])
+fi
+
+if test "x$enable_cms" = "xyes"; then
   AC_DEFINE(USE_CMS, 1, [Defines if use cms])
 fi
 AM_CONDITIONAL(USE_CMS, test x$enable_cms = xyes)
@@ -518,6 +525,10 @@ esac
 
 AC_SUBST(PC_REQUIRES)
 AC_SUBST(PC_REQUIRES_PRIVATE)
+
+AC_SUBST([POPPLER_MAJOR_VERSION],[poppler_version_major])
+AC_SUBST([POPPLER_MINOR_VERSION],[poppler_version_minor])
+AC_SUBST([POPPLER_MICRO_VERSION],[poppler_version_micro])
 
 AC_OUTPUT([
 Makefile

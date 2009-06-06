@@ -18,7 +18,7 @@
 // Copyright (C) 2005, 2006 Kristian Høgsberg <krh@redhat.com>
 // Copyright (C) 2005, 2009 Albert Astals Cid <aacid@kde.org>
 // Copyright (C) 2005 Nickolay V. Shmyrev <nshmyrev@yandex.ru>
-// Copyright (C) 2006-2008 Carlos Garcia Campos <carlosgc@gnome.org>
+// Copyright (C) 2006-2009 Carlos Garcia Campos <carlosgc@gnome.org>
 // Copyright (C) 2008 Carl Worth <cworth@cworth.org>
 // Copyright (C) 2008 Adrian Johnson <ajohnson@redneon.com>
 // Copyright (C) 2008 Michael Vrable <mvrable@cs.ucsd.edu>
@@ -124,6 +124,7 @@ CairoOutputDev::CairoOutputDev() {
   stroke_opacity = 1.0;
   fill_opacity = 1.0;
   textClipPath = NULL;
+  haveCSPattern = gFalse;
   cairo = NULL;
   currentFont = NULL;
   prescaleImages = gTrue;
@@ -507,6 +508,15 @@ void CairoOutputDev::updateFont(GfxState *state) {
   cairo_set_font_matrix (cairo, &matrix);
 }
 
+void CairoOutputDev::updateRender(GfxState *state) {
+  int rm;
+  rm = state->getRender();
+  if (rm == 7 && haveCSPattern) {
+    haveCSPattern = gFalse;
+    restoreState(state);
+  }
+}
+
 void CairoOutputDev::doPath(cairo_t *cairo, GfxState *state, GfxPath *path) {
   GfxSubpath *subpath;
   int i, j;
@@ -758,7 +768,40 @@ void CairoOutputDev::type3D1(GfxState *state, double wx, double wy,
   t3_glyph_has_bbox = gTrue;
 }
 
+void CairoOutputDev::beginTextObject(GfxState *state) {
+  if (state->getFillColorSpace()->getMode() == csPattern) {
+    haveCSPattern = gTrue;
+    saveState(state);
+    savedRender = state->getRender();
+    state->setRender(7); // Set clip to text path
+  }
+}
+
 void CairoOutputDev::endTextObject(GfxState *state) {
+  if (haveCSPattern) {
+    state->setRender(savedRender);
+    haveCSPattern = gFalse;
+    if (state->getFillColorSpace()->getMode() != csPattern) {
+      if (textClipPath) {
+	cairo_new_path (cairo);
+	cairo_append_path (cairo, textClipPath);
+	cairo_set_fill_rule (cairo, CAIRO_FILL_RULE_WINDING);
+	cairo_set_source (cairo, fill_pattern);
+	cairo_fill (cairo);
+	if (cairo_shape) {
+	  cairo_new_path (cairo_shape);
+	  cairo_append_path (cairo_shape, textClipPath);
+	  cairo_set_fill_rule (cairo_shape, CAIRO_FILL_RULE_WINDING);
+	  cairo_fill (cairo_shape);
+	}
+	cairo_path_destroy (textClipPath);
+	textClipPath = NULL;
+      }
+      restoreState(state);
+      updateFillColor(state);
+    }
+  }
+
   if (textClipPath) {
     // clip the accumulated text path
     cairo_append_path (cairo, textClipPath);
@@ -1057,6 +1100,10 @@ void CairoOutputDev::clearSoftMask(GfxState * /*state*/) {
   mask = NULL;
 }
 
+void CairoOutputDev::endMaskClip(GfxState *state) {
+  clearSoftMask(state);
+}
+
 void CairoOutputDev::drawImageMask(GfxState *state, Object *ref, Stream *str,
 				    int width, int height, GBool invert,
 				    GBool inlineImg) {
@@ -1134,11 +1181,13 @@ void CairoOutputDev::drawImageMaskRegular(GfxState *state, Object *ref, Stream *
   image = cairo_image_surface_create_for_data (buffer, CAIRO_FORMAT_A8,
 					       width, height, row_stride);
   if (image == NULL) {
+    imgStr->close();
     delete imgStr;
     return;
   }
   pattern = cairo_pattern_create_for_surface (image);
   if (pattern == NULL) {
+    imgStr->close();
     delete imgStr;
     return;
   }
@@ -1175,6 +1224,7 @@ void CairoOutputDev::drawImageMaskRegular(GfxState *state, Object *ref, Stream *
   cairo_pattern_destroy (pattern);
   cairo_surface_destroy (image);
   free (buffer);
+  imgStr->close();
   delete imgStr;
 }
 
@@ -1394,11 +1444,13 @@ void CairoOutputDev::drawImageMaskPrescaled(GfxState *state, Object *ref, Stream
   image = cairo_image_surface_create_for_data (buffer, CAIRO_FORMAT_A8,
       scaledWidth, scaledHeight, row_stride);
   if (image == NULL) {
+    imgStr->close();
     delete imgStr;
     return;
   }
   pattern = cairo_pattern_create_for_surface (image);
   if (pattern == NULL) {
+    imgStr->close();
     delete imgStr;
     return;
   }
@@ -1446,6 +1498,7 @@ void CairoOutputDev::drawImageMaskPrescaled(GfxState *state, Object *ref, Stream
   cairo_pattern_destroy (pattern);
   cairo_surface_destroy (image);
   free (buffer);
+  imgStr->close();
   delete imgStr;
 }
 
@@ -1485,9 +1538,8 @@ void CairoOutputDev::drawMaskedImage(GfxState *state, Object *ref,
 
   maskImage = cairo_image_surface_create_for_data (maskBuffer, CAIRO_FORMAT_A8,
 						 maskWidth, maskHeight, row_stride);
-
+  maskImgStr->close();
   delete maskImgStr;
-  maskStr->close();
 
   unsigned char *buffer;
   unsigned int *dest;
@@ -1521,12 +1573,14 @@ void CairoOutputDev::drawMaskedImage(GfxState *state, Object *ref,
 						 width, height, width * 4);
 
   if (image == NULL) {
+    imgStr->close();
     delete imgStr;
     return;
   }
   pattern = cairo_pattern_create_for_surface (image);
   maskPattern = cairo_pattern_create_for_surface (maskImage);
   if (pattern == NULL) {
+    imgStr->close();
     delete imgStr;
     return;
   }
@@ -1566,6 +1620,7 @@ void CairoOutputDev::drawMaskedImage(GfxState *state, Object *ref,
   cairo_surface_destroy (image);
   free (buffer);
   free (maskBuffer);
+  imgStr->close();
   delete imgStr;
 }
 
@@ -1601,8 +1656,8 @@ void CairoOutputDev::drawSoftMaskedImage(GfxState *state, Object *ref, Stream *s
   maskImage = cairo_image_surface_create_for_data (maskBuffer, CAIRO_FORMAT_A8,
 						 maskWidth, maskHeight, row_stride);
 
+  maskImgStr->close();
   delete maskImgStr;
-  maskStr->close();
 
   unsigned char *buffer;
   unsigned int *dest;
@@ -1637,12 +1692,14 @@ void CairoOutputDev::drawSoftMaskedImage(GfxState *state, Object *ref, Stream *s
 						 width, height, width * 4);
 
   if (image == NULL) {
+    imgStr->close();
     delete imgStr;
     return;
   }
   pattern = cairo_pattern_create_for_surface (image);
   maskPattern = cairo_pattern_create_for_surface (maskImage);
   if (pattern == NULL) {
+    imgStr->close();
     delete imgStr;
     return;
   }
@@ -1687,6 +1744,7 @@ void CairoOutputDev::drawSoftMaskedImage(GfxState *state, Object *ref, Stream *s
   free (buffer);
   free (maskBuffer);
 
+  imgStr->close();
   delete imgStr;
 }
 void CairoOutputDev::drawImage(GfxState *state, Object *ref, Stream *str,
@@ -1754,11 +1812,13 @@ void CairoOutputDev::drawImage(GfxState *state, Object *ref, Stream *str,
   }
 
   if (image == NULL) {
+   imgStr->close();
    delete imgStr;
    return;
   }
   pattern = cairo_pattern_create_for_surface (image);
   if (pattern == NULL) {
+    imgStr->close();
     delete imgStr;
     return;
   }
@@ -1793,6 +1853,7 @@ void CairoOutputDev::drawImage(GfxState *state, Object *ref, Stream *str,
   cairo_pattern_destroy (pattern);
   cairo_surface_destroy (image);
   free (buffer);
+  imgStr->close();
   delete imgStr;
 }
 

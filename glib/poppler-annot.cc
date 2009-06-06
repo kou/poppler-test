@@ -270,7 +270,7 @@ poppler_annot_set_contents (PopplerAnnot *poppler_annot,
   
   g_return_if_fail (POPPLER_IS_ANNOT (poppler_annot));
 
-  tmp = contents ? g_convert (contents, -1, "UTF16BE", "UTF8", NULL, &length, NULL) : NULL;
+  tmp = contents ? g_convert (contents, -1, "UTF-16BE", "UTF-8", NULL, &length, NULL) : NULL;
   goo_tmp = new GooString (tmp, length);
   g_free (tmp);
   poppler_annot->annot->setContents (goo_tmp);
@@ -345,41 +345,47 @@ poppler_annot_get_flags (PopplerAnnot *poppler_annot)
  * Retrieves the color of @poppler_annot.
  *
  * Return value: a new allocated #PopplerColor with the color values of
- *               @poppler_annot. It must be freed with g_free() when done.
+ *               @poppler_annot, or %NULL. It must be freed with g_free() when done.
  **/
 PopplerColor *
 poppler_annot_get_color (PopplerAnnot *poppler_annot)
 {
   AnnotColor *color;
+  PopplerColor *poppler_color = NULL;
 
   g_return_val_if_fail (POPPLER_IS_ANNOT (poppler_annot), NULL);
 
-  if ((color = poppler_annot->annot->getColor ())) {
-    PopplerColor *poppler_color;
+  color = poppler_annot->annot->getColor ();
+
+  if (color) {
     double *values = color->getValues ();
 
     switch (color->getSpace ())
       {
       case AnnotColor::colorGray:
         poppler_color = g_new (PopplerColor, 1);
-        poppler_color->red = (guint16) values[0];
-        poppler_color->green = (guint16) values[0];
-        poppler_color->blue = (guint16) values[0];
-        return poppler_color;
+	
+        poppler_color->red = (guint16) (values[0] * 65535);
+        poppler_color->green = poppler_color->red;
+        poppler_color->blue = poppler_color->red;
+
+	break;
       case AnnotColor::colorRGB:
         poppler_color = g_new (PopplerColor, 1);
-        poppler_color->red = (guint16) values[0];
-        poppler_color->green = (guint16) values[1];
-        poppler_color->blue = (guint16) values[2];
-        return poppler_color;
-      case AnnotColor::colorTransparent:
+	
+        poppler_color->red = (guint16) (values[0] * 65535);
+        poppler_color->green = (guint16) (values[1] * 65535);
+        poppler_color->blue = (guint16) (values[2] * 65535);
+
+	break;
       case AnnotColor::colorCMYK:
-      default:
-        g_warning ("Unsupported Annot Color");
+        g_warning ("Unsupported Annot Color: colorCMYK");
+      case AnnotColor::colorTransparent:
+        break;
       }
   }
 
-  return NULL;
+  return poppler_color;
 }
 
 /* PopplerAnnotMarkup */
@@ -407,6 +413,26 @@ poppler_annot_markup_get_label (PopplerAnnotMarkup *poppler_annot)
 }
 
 /**
+ * poppler_annot_markup_has_popup:
+ * @poppler_annot: a #PopplerAnnotMarkup
+ *
+ * Return %TRUE if the markup annotation has a popup window associated
+ *
+ * Return value: %TRUE, if @poppler_annot has popup, %FALSE otherwise
+ **/
+gboolean
+poppler_annot_markup_has_popup (PopplerAnnotMarkup *poppler_annot)
+{
+  AnnotMarkup *annot;
+
+  g_return_val_if_fail (POPPLER_IS_ANNOT_MARKUP (poppler_annot), FALSE);
+
+  annot = static_cast<AnnotMarkup *>(POPPLER_ANNOT (poppler_annot)->annot);
+
+  return annot->getPopup () != NULL;
+}
+
+/**
  * poppler_annot_markup_get_popup_is_open:
  * @poppler_annot: a #PopplerAnnotMarkup
  *
@@ -429,6 +455,41 @@ poppler_annot_markup_get_popup_is_open (PopplerAnnotMarkup *poppler_annot)
     return annot_popup->getOpen ();
 
   return FALSE;
+}
+
+/**
+ * poppler_annot_markup_get_popup_rectangle:
+ * @poppler_annot: a #PopplerAnnotMarkup
+ * @poppler_rect: a #PopplerRectangle to store the popup rectangle
+ *
+ * Retrieves the rectangle of the popup annot related to @poppler_annot.
+ *
+ * Return value: %TRUE if #PopplerRectangle was correctly filled,
+ *               %FALSE otherwise
+ **/
+gboolean
+poppler_annot_markup_get_popup_rectangle (PopplerAnnotMarkup *poppler_annot,
+					  PopplerRectangle   *poppler_rect)
+{
+  AnnotMarkup *annot;
+  Annot *annot_popup;
+  PDFRectangle *annot_rect;
+
+  g_return_val_if_fail (POPPLER_IS_ANNOT_MARKUP (poppler_annot), FALSE);
+  g_return_val_if_fail (poppler_rect != NULL, FALSE);
+
+  annot = static_cast<AnnotMarkup *>(POPPLER_ANNOT (poppler_annot)->annot);
+  annot_popup = annot->getPopup ();
+  if (!annot_popup)
+    return FALSE;
+
+  annot_rect = annot_popup->getRect ();
+  poppler_rect->x1 = annot_rect->x1;
+  poppler_rect->x2 = annot_rect->x2;
+  poppler_rect->y1 = annot_rect->y1;
+  poppler_rect->y2 = annot_rect->y2;
+
+  return TRUE;
 }
 
 /**

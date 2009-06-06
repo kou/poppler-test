@@ -106,12 +106,14 @@ abiword_libs =					\
 endif
 
 if USE_CMS
-cms_libs = -llcms
+cms_includes = $(LCMS_CFLAGS)
+cms_libs = $(LCMS_LIBS)
 endif
 
 INCLUDES =					\
 	-I$(top_srcdir)				\
 	-I$(top_srcdir)/goo			\
+	$(cms_includes)				\
 	$(splash_includes)			\
 	$(cairo_includes)			\
 	$(arthur_includes)			\
@@ -141,7 +143,7 @@ libpoppler_la_LIBADD =				\
 	$(PTHREAD_LIBS)				\
 	$(win32_libs)
 
-libpoppler_la_LDFLAGS = -version-info 4:0:0 @create_shared_lib@
+libpoppler_la_LDFLAGS = -version-info 5:0:0 @create_shared_lib@
 
 if ENABLE_XPDF_HEADERS
 
@@ -167,6 +169,7 @@ poppler_include_HEADERS =	\
 	Gfx.h			\
 	GfxFont.h		\
 	GfxState.h		\
+	GfxState_helpers.h	\
 	GlobalParams.h		\
 	JArithmeticDecoder.h	\
 	JBIG2Stream.h		\

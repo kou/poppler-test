@@ -23,6 +23,7 @@
 // Copyright (C) 2008 Haruyuki Kawabe <Haruyuki.Kawabe@unisys.co.jp>
 // Copyright (C) 2008 Tomas Are Haavet <tomasare@gmail.com>
 // Copyright (C) 2009 Warren Toomey <wkt@tuhs.org>
+// Copyright (C) 2009 Carlos Garcia Campos <carlosgc@gnome.org>
 //
 // To see a description of the changes please see the Changelog file that
 // came with your tarball or type make ChangeLog if you are building from git
@@ -1414,6 +1415,7 @@ void HtmlOutputDev::drawImage(GfxState *state, Object *ref, Stream *str,
     free(row);
     imgList->append(fName);
     ++imgNum;
+    imgStr->close();
     delete imgStr;
 #else
     OutputDev::drawImage(state, ref, str, width, height, colorMap,

@@ -34,6 +34,7 @@ class LinkDestinationPrivate : public QSharedData
 		LinkDestinationPrivate();
 
 		LinkDestination::Kind kind; // destination type
+		QString name;
 		int pageNum; // page number
 		double left, bottom; // position
 		double right, top;
@@ -192,10 +193,15 @@ class LinkMoviePrivate : public LinkPrivate
 		bool deleteDest = false;
 		LinkDest *ld = data.ld;
 		
-		if ( data.namedDest && !ld )
+		if ( data.namedDest && !ld && !data.externalDest )
 		{
 			deleteDest = true;
 			ld = data.doc->doc->findDest( data.namedDest );
+		}
+		// in case this destination was named one, and it was not resolved
+		if ( data.namedDest && !ld )
+		{
+			d->name = QString::fromLatin1( data.namedDest->getCString() );
 		}
 		
 		if (!ld) return;
@@ -330,6 +336,11 @@ class LinkMoviePrivate : public LinkPrivate
 		s += ";" + QString::number( (qint8)d->changeTop );
 		s += ";" + QString::number( (qint8)d->changeZoom );
 		return s;
+	}
+	
+	QString LinkDestination::destinationName() const
+	{
+		return d->name;
 	}
 	
 	LinkDestination& LinkDestination::operator=(const LinkDestination &other)
