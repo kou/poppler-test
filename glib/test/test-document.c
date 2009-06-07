@@ -516,6 +516,12 @@ attachment_inspect (GString *string, gconstpointer data, gpointer user_data)
 {
   const PopplerAttachment *attachment = data;
 
+  if (!attachment)
+    {
+      g_string_append (string, "(null)");
+      return;
+    }
+
   g_string_append (string, "#<PopplerAttachment ");
   g_string_append_printf (string, "name=<%s>, ", attachment->name);
   g_string_append_printf (string, "description=<%s>, ", attachment->description);
