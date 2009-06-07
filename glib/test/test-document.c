@@ -485,6 +485,17 @@ attachment_new (const gchar *name, const gchar *description,
     attachment->checksum = NULL;
 }
 
+static void
+attachment_unref (gpointer data)
+{
+  PopplerAttachment *attachment = data;
+
+  if (!attachment)
+    return;
+
+  g_object_unref (attachment);
+}
+
 static gboolean
 attachment_equal (gconstpointer data1, gconstpointer data2)
 {
@@ -559,8 +570,8 @@ test_attachment (void)
                                             0, 0, NULL));
 
   actual = poppler_document_get_attachments (document);
-  gcut_take_list (expected, g_object_unref);
-  gcut_take_list (actual, g_object_unref);
+  gcut_take_list (expected, attachment_unref);
+  gcut_take_list (actual, attachment_unref);
   gcut_assert_equal_list (expected,
                           actual,
                           attachment_equal,
@@ -577,7 +588,7 @@ test_attachment_save (void)
   cut_assert_true (poppler_document_has_attachments (document));
 
   attachments = poppler_document_get_attachments (document);
-  gcut_take_list (attachments, g_object_unref);
+  gcut_take_list (attachments, attachment_unref);
   for (node = attachments; node; node = g_list_next (node))
     {
       PopplerAttachment *attachment = node->data;
