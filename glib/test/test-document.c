@@ -223,8 +223,7 @@ inspect_property (const gchar *title,
   inspected_permissions =
     gcut_flags_inspect (POPPLER_TYPE_PERMISSIONS, permissions);
 
-  inspected = g_strdup_printf (inspected,
-                               "{"
+  inspected = g_strdup_printf ("{"
                                "title=<%s>, "
                                "format=<%s>, "
                                "author=<%s>, "
