@@ -482,6 +482,8 @@ attachment_new (const gchar *name, const gchar *description,
     attachment->checksum = g_string_new_len (checksum, strlen (checksum));
   else
     attachment->checksum = NULL;
+
+  return attachment;
 }
 
 static void
