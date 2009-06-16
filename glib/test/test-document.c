@@ -377,10 +377,22 @@ cut_poppler_assert_equal_property_helper (const gchar *title,
 void
 test_property (void)
 {
+  gint gmt_creation_date, local_creation_date;
+  struct tm *local_time;
+  time_t base, tz_diff;
+
+  time (&base);
+  local_time = localtime (&base);
+  tz_diff = mktime (local_time) - mktime (gmtime (&base));
+  if (local_time->tm_isdst)
+    tz_diff += 3600;
+
+  gmt_creation_date = 1223848360;
+  local_creation_date = gmt_creation_date - tz_diff;
   document = load_document ("property.pdf");
   cut_poppler_assert_equal_property ("Property Document", "PDF-1.4", NULL,
                                      "property", "property, test",
-                                     1223783560, 0,
+                                     local_creation_date, 0,
                                      "Writer", "OpenOffice.org 2.4",
                                      "No",
                                      POPPLER_PAGE_MODE_USE_THUMBS,
