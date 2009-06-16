@@ -1824,6 +1824,7 @@ void Gfx::doTilingPatternFill(GfxTilingPattern *tPat,
 			      GBool stroke, GBool eoFill) {
   GfxPatternColorSpace *patCS;
   GfxColorSpace *cs;
+  GfxColor color;
   GfxPath *savedPath;
   double xMin, yMin, xMax, yMax, x, y, x1, y1;
   double cxMin, cyMin, cxMax, cyMax;
@@ -1886,21 +1887,25 @@ void Gfx::doTilingPatternFill(GfxTilingPattern *tPat,
     out->updateFillColorSpace(state);
     state->setStrokeColorSpace(cs->copy());
     out->updateStrokeColorSpace(state);
-    state->setStrokeColor(state->getFillColor());
+    if (stroke) {
+	state->setFillColor(state->getStrokeColor());
+    } else {
+	state->setStrokeColor(state->getFillColor());
+    }
   } else {
-    state->setFillColorSpace(new GfxDeviceGrayColorSpace());
+    cs = new GfxDeviceGrayColorSpace();
+    state->setFillColorSpace(cs);
+    cs->getDefaultColor(&color);
+    state->setFillColor(&color);
     out->updateFillColorSpace(state);
     state->setStrokeColorSpace(new GfxDeviceGrayColorSpace());
+    state->setStrokeColor(&color);
     out->updateStrokeColorSpace(state);
   }
   state->setFillPattern(NULL);
   out->updateFillColor(state);
   state->setStrokePattern(NULL);
   out->updateStrokeColor(state);
-  if (!stroke) {
-    state->setLineWidth(0);
-    out->updateLineWidth(state);
-  }
 
   // clip to current path
   if (stroke) {
@@ -1915,6 +1920,8 @@ void Gfx::doTilingPatternFill(GfxTilingPattern *tPat,
     }
   }
   state->clearPath();
+  state->setLineWidth(0);
+  out->updateLineWidth(state);
 
   // get the clip region, check for empty
   state->getClipBBox(&cxMin, &cyMin, &cxMax, &cyMax);

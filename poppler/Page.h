@@ -126,7 +126,7 @@ class Page {
 public:
 
   // Constructor.
-  Page(XRef *xrefA, int numA, Dict *pageDict, PageAttrs *attrsA, Form *form);
+  Page(XRef *xrefA, int numA, Dict *pageDict, Ref pageRefA, PageAttrs *attrsA, Form *form);
 
   // Destructor.
   ~Page();
@@ -163,6 +163,8 @@ public:
 
   // Get annotations array.
   Object *getAnnots(Object *obj) { return annots.fetch(xref, obj); }
+  // Add a new annotation to the page
+  void addAnnot(Annot *annot);
 
   // Return a list of links.
   Links *getLinks(Catalog *catalog);
@@ -235,6 +237,8 @@ public:
 private:
 
   XRef *xref;			// the xref table for this PDF file
+  Object pageObj;               // page dictionary
+  Ref pageRef;                  // page reference
   int num;			// page number
   PageAttrs *attrs;		// page attributes
   Object annots;		// annotations array
