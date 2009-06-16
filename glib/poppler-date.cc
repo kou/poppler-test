@@ -41,7 +41,6 @@ poppler_date_parse (const gchar *date,
   time_t retval;
   
   /* See PDF Reference 1.3, Section 3.8.2 for PDF Date representation */
-  // TODO do something with the timezone information
   if (!parseDateString (date, &year, &mon, &day, &hour, &min, &sec, &tz, &tz_hour, &tz_minute))
     return FALSE;
 	
@@ -60,6 +59,18 @@ poppler_date_parse (const gchar *date,
   if (retval == (time_t) - 1)
     return FALSE;
     
+  switch (tz)
+    {
+      case '-':
+        retval -= tz_hour * 3600 + tz_minute;
+        break;
+      case '+':
+        retval += tz_hour * 3600 + tz_minute;
+        break;
+      default:
+        break;
+    }
+
   *timet = retval;
 
   return TRUE;	
