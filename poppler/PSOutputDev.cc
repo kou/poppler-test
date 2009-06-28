@@ -22,6 +22,7 @@
 // Copyright (C) 2008 Hib Eris <hib@hiberis.nl>
 // Copyright (C) 2009 Thomas Freitag <Thomas.Freitag@alfa.de>
 // Copyright (C) 2009 Till Kamppeter <till.kamppeter@gmail.com>
+// Copyright (C) 2009 Carlos Garcia Campos <carlosgc@gnome.org>
 //
 // To see a description of the changes please see the Changelog file that
 // came with your tarball or type make ChangeLog if you are building from git
@@ -1307,6 +1308,8 @@ void PSOutputDev::writeHeader(int firstPage, int lastPage,
 
   switch (mode) {
   case psModePSOrigPageSizes:
+    prevWidth = 0;
+    prevHeight = 0;
   case psModePS:
     writePSFmt("%%DocumentMedia: plain {0:d} {1:d} 0 () ()\n",
 	       paperWidth, paperHeight);
@@ -3185,7 +3188,13 @@ void PSOutputDev::startPage(int pageNum, GfxState *state) {
     writePS("%%BeginPageSetup\n");
     writePSFmt("%%PageOrientation: {0:s}\n",
 	       landscape ? "Landscape" : "Portrait");
-    writePSFmt("<</PageSize [{0:d} {1:d}]>> setpagedevice\n", width, height);
+    if ((width != prevWidth) || (height != prevHeight)) {
+      // Set page size only when it actually changes, as otherwise Duplex
+      // printing does not work
+      writePSFmt("<</PageSize [{0:d} {1:d}]>> setpagedevice\n", width, height);
+      prevWidth = width;
+      prevHeight = height;
+    }
     writePS("pdfStartPage\n");
     writePSFmt("{0:d} {1:d} {2:d} {3:d} re W\n", x1, y1, x2 - x1, y2 - y1);
     writePS("%%EndPageSetup\n");
@@ -4371,7 +4380,7 @@ void PSOutputDev::endMaskClip(GfxState * state) {
 
 void PSOutputDev::drawImageMask(GfxState *state, Object *ref, Stream *str,
 				int width, int height, GBool invert,
-				GBool inlineImg) {
+				GBool interpolate, GBool inlineImg) {
   int len;
 
   len = height * ((width + 7) / 8);
@@ -4399,7 +4408,7 @@ void PSOutputDev::drawImageMask(GfxState *state, Object *ref, Stream *str,
 
 void PSOutputDev::drawImage(GfxState *state, Object *ref, Stream *str,
 			    int width, int height, GfxImageColorMap *colorMap,
-			    int *maskColors, GBool inlineImg) {
+			    GBool interpolate, int *maskColors, GBool inlineImg) {
   int len;
 
   len = height * ((width * colorMap->getNumPixelComps() *
@@ -4429,9 +4438,10 @@ void PSOutputDev::drawImage(GfxState *state, Object *ref, Stream *str,
 void PSOutputDev::drawMaskedImage(GfxState *state, Object *ref, Stream *str,
 				  int width, int height,
 				  GfxImageColorMap *colorMap,
+				  GBool interpolate,
 				  Stream *maskStr,
 				  int maskWidth, int maskHeight,
-				  GBool maskInvert) {
+				  GBool maskInvert, GBool maskInterpolate) {
   int len;
 
   len = height * ((width * colorMap->getNumPixelComps() *

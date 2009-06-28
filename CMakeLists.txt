@@ -13,7 +13,7 @@ include(MacroBoolTo01)
 
 set(POPPLER_MAJOR_VERSION "0")
 set(POPPLER_MINOR_VERSION "11")
-set(POPPLER_MICRO_VERSION "0")
+set(POPPLER_MICRO_VERSION "1")
 set(POPPLER_VERSION "${POPPLER_MAJOR_VERSION}.${POPPLER_MINOR_VERSION}.${POPPLER_MICRO_VERSION}")
 
 # command line switches
@@ -308,6 +308,7 @@ if(ENABLE_XPDF_HEADERS)
     poppler/Parser.h
     poppler/PDFDoc.h
     poppler/PDFDocEncoding.h
+    poppler/PopplerCache.h
     poppler/ProfileData.h
     poppler/PreScanOutputDev.h
     poppler/PSTokenizer.h

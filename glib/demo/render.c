@@ -165,16 +165,16 @@ pgd_render_start (GtkButton     *button,
 #if defined (HAVE_CAIRO)
 	if (demo->mode == PGD_RENDER_CAIRO) {
 		cairo_t *cr;
-		
+		cairo_pattern_t *pattern;
+
 		timer = g_timer_new ();
-		demo->surface = cairo_image_surface_create (CAIRO_FORMAT_RGB24,
+		demo->surface = cairo_image_surface_create (CAIRO_FORMAT_ARGB32,
 							    width, height);
 		cr = cairo_create (demo->surface);
 
 		cairo_save (cr);
-		cairo_set_source_rgb (cr, 1, 1, 1);
-		cairo_rectangle (cr, 0, 0, width, height);
-		cairo_fill (cr);
+		cairo_set_source_rgba (cr, 1., 1., 1., 0);
+		cairo_paint (cr);
 		cairo_restore (cr);
 
 		cairo_save (cr);
@@ -200,6 +200,12 @@ pgd_render_start (GtkButton     *button,
 		
 		poppler_page_render (page, cr);
 		cairo_restore (cr);
+
+		pattern = cairo_pattern_create_rgb (1., 1., 1.);
+		cairo_set_operator (cr, CAIRO_OPERATOR_DEST_OVER);
+		cairo_set_source (cr, pattern);
+		cairo_paint (cr);
+		cairo_pattern_destroy (pattern);
 		g_timer_stop (timer);
 		
 		cairo_destroy (cr);
